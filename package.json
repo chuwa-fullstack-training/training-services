@@ -2,14 +2,19 @@
   "name": "todo-list-service",
   "version": "1.0.50",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "build": "bun build src/index.ts --target bun --outdir ./dist",
+    "dev": "bun run --watch src/index.ts",
+    "start": "NODE_ENV=production bun dist/index.js",
+    "test": "bun test"
   },
   "dependencies": {
+    "@elysiajs/swagger": "^1.1.5",
+    "@prisma/client": "^5.21.1",
     "elysia": "latest"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "prisma": "^5.21.1"
   },
   "module": "src/index.js"
 }
