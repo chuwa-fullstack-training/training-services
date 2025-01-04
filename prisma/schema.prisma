@@ -10,8 +10,52 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Category {
+  id    Int    @id @default(autoincrement())
+  name  String
+  todos Todo[]
+}
+
 model Todo {
-  id        String  @id @default(cuid())
+  id         String   @id @default(cuid())
+  title      String
+  completed  Boolean  @default(false)
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId Int
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+}
+
+model User {
+  id       String    @id @default(cuid())
+  email    String    @unique
+  password String
+  todos    Todo[]
+  posts    Post[]
+  comment  Comment[]
+}
+
+model Post {
+  id        String    @id @default(cuid())
   title     String
-  completed Boolean @default(false)
+  content   String
+  published Boolean   @default(false)
+  author    User      @relation(fields: [authorId], references: [id])
+  authorId  String
+  comment   Comment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
