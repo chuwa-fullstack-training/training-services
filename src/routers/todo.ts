@@ -5,9 +5,12 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
   .get(
     '/',
     async ({ query }) => {
-      const { userId } = query;
+      const { userId, categoryId } = query;
       const todos = await prisma.todo.findMany({
-        where: { userId: userId ? userId : undefined }
+        where: {
+          userId: userId ? userId : undefined,
+          categoryId: categoryId ? categoryId : undefined
+        }
       });
       return todos.map(todo => ({
         ...todo,
@@ -17,6 +20,10 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       }));
     },
     {
+      query: t.Object({
+        userId: t.Optional(t.String()),
+        categoryId: t.Optional(t.Number())
+      }),
       response: t.Array(
         t.Object({
           id: t.String(),
@@ -28,6 +35,33 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
           updatedAt: t.String()
         })
       )
+    }
+  )
+  .get(
+    '/:id',
+    async ({ params }) => {
+      const todo = await prisma.todo.findUnique({ where: { id: params.id } });
+      if (!todo) {
+        throw new Error('Todo not found');
+      }
+      return {
+        ...todo,
+        userId: todo.userId ?? '',
+        createdAt: formatDate(todo.createdAt),
+        updatedAt: formatDate(todo.updatedAt)
+      };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      response: t.Object({
+        id: t.String(),
+        title: t.String(),
+        completed: t.Boolean(),
+        categoryId: t.Number(),
+        userId: t.String(),
+        createdAt: t.String(),
+        updatedAt: t.String()
+      })
     }
   )
   .post(
@@ -67,10 +101,16 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
     '/:id',
     async ({ body, params }) => {
       // update a todo
-      return await prisma.todo.update({
+      const todo = await prisma.todo.update({
         where: { id: params.id },
         data: body
       });
+      return {
+        ...todo,
+        userId: todo.userId ?? '',
+        createdAt: formatDate(todo.createdAt),
+        updatedAt: formatDate(todo.updatedAt)
+      };
     },
     {
       body: t.Object({
@@ -80,6 +120,15 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       }),
       params: t.Object({
         id: t.String()
+      }),
+      response: t.Object({
+        id: t.String(),
+        title: t.String(),
+        completed: t.Boolean(),
+        categoryId: t.Number(),
+        userId: t.String(),
+        createdAt: t.String(),
+        updatedAt: t.String()
       })
     }
   )

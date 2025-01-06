@@ -42,14 +42,14 @@ export const categoryRouter = new Elysia({ prefix: '/api/categories' })
       ])
     }
   )
-  .post(
-    '/',
-    async ({ body }) => {
-      const { name } = body;
-      return await prisma.category.create({ data: { name } });
-    },
-    {
-      body: t.Object({ name: t.String() }),
-      response: t.Object({ id: t.Number(), name: t.String() })
-    }
-  );
+  // .post(
+  //   '/',
+  //   async ({ body }) => {
+  //     const { name } = body;
+  //     return await prisma.category.create({ data: { name } });
+  //   },
+  //   {
+  //     body: t.Object({ name: t.String() }),
+  //     response: t.Object({ id: t.Number(), name: t.String() })
+  //   }
+  // );

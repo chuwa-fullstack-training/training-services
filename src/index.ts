@@ -3,6 +3,7 @@ import { swagger } from '@elysiajs/swagger';
 import { todoRouter } from './routers/todo';
 import { categoryRouter } from './routers/category';
 import { userRouter } from './routers/user';
+
 const app = new Elysia()
   .use(swagger())
   .use(categoryRouter)
