@@ -7,20 +7,22 @@ export const messageSchema = t.Object({
     t.Literal('success'),
     t.Literal('info'),
     t.Literal('warning'),
-    t.Literal('error')
   ]),
-  data: t.Optional(t.Any()),
-  code: t.Optional(t.Number())
+  data: t.Optional(t.Any())
+});
+
+export const errorSchema = t.Object({
+  message: t.String(),
+  data: t.Optional(t.Any())
 });
 
 export const message = (
   message: string,
-  options?: { status?: MessageResponse['status']; data?: unknown; code?: number }
+  options?: { status?: MessageResponse['status']; data?: unknown }
 ): MessageResponse => {
   return {
     message,
     status: options?.status ?? 'success',
-    ...(options?.data && { data: options.data } || {}),
-    ...(options?.code && { code: options.code } || {})
+    ...((options?.data && { data: options.data }) || {})
   };
 };
