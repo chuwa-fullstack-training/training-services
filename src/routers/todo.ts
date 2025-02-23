@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { formatDate, prisma } from '../libs';
+import { formatDate, prisma } from '../lib';
 
 export const todoRouter = new Elysia({ prefix: '/api/todos' })
   .get(
