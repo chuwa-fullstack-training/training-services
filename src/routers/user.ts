@@ -1,8 +1,8 @@
 import { jwt } from '@elysiajs/jwt';
 import { Elysia, t } from 'elysia';
 import { prisma } from '../lib';
-import { message, messageSchema } from '../lib/message';
-import { AppError, UserAlreadyExistsError, UserError } from '../lib/errors';
+import { UserAlreadyExistsError } from '../lib/errors';
+import { errorSchema, message, messageSchema } from '../lib/message';
 
 export const userRouter = new Elysia()
   .use(
@@ -13,19 +13,22 @@ export const userRouter = new Elysia()
   )
   .group('/api/auth', app =>
     app
+      .onError(({ code, error }) => {
+        if (code === 'VALIDATION') {
+          return {
+            message: 'Validation error',
+            data: error.all
+          };
+        }
+        return {
+          message: 'An unexpected error occurred',
+          data: error
+        };
+      })
       .post(
         '/login',
         async ({ body, jwt, error }) => {
           const { email, password } = body;
-          if (!email || !password) {
-            return error(400, {
-              message: 'Email and password are required',
-              data: {
-                email: !email ? 'Email is required' : undefined,
-                password: !password ? 'Password is required' : undefined
-              }
-            });
-          }
           const user = await prisma.user.findUnique({ where: { email } });
           if (!user) {
             return error(400, {
@@ -49,63 +52,52 @@ export const userRouter = new Elysia()
         },
         {
           body: t.Object({
-            email: t.String(),
-            password: t.String()
+            email: t.String({ format: 'email', error: 'Invalid email' }),
+            password: t.String({
+              minLength: 8,
+              maxLength: 16,
+              error: 'Password must be between 8 and 16 characters long'
+            })
           }),
           response: {
             200: messageSchema,
-            400: t.Object({
-              message: t.String(),
-              data: t.Optional(t.Any())
-            })
+            400: errorSchema
           }
         }
       )
       .post(
         '/signup',
-        async ({ body }) => {
+        async ({ body, error }) => {
           try {
             const { email, password } = body;
             await prisma.user.signUp(email, password);
             return message('User created successfully');
-          } catch (error) {
-            if (error instanceof UserAlreadyExistsError) {
-              return message(error.message, {
-                status: 'error',
-                code: 400,
-                data: error.details
+          } catch (e) {
+            if (e instanceof UserAlreadyExistsError) {
+              return error(400, {
+                message: e.message,
+                data: e.details
               });
             }
-            if (error instanceof UserError) {
-              return message(error.message, {
-                status: 'error',
-                code: error.status,
-                data: error.details
-              });
-            }
-
-            if (error instanceof AppError) {
-              return message('Failed to create user', {
-                status: 'error',
-                code: error.status,
-                data: error.details
-              });
-            }
-
-            // Unexpected errors
-            console.error('Unexpected error:', error);
-            return message('An unexpected error occurred', {
-              status: 'error',
-              code: 500
+            return error(400, {
+              message: 'User creation failed',
+              data: e
             });
           }
         },
         {
           body: t.Object({
-            email: t.String(),
-            password: t.String()
+            email: t.String({ format: 'email', error: 'Invalid email' }),
+            password: t.String({
+              minLength: 8,
+              maxLength: 16,
+              error: 'Password must be between 8 and 16 characters long'
+            })
           }),
-          response: messageSchema
+          response: {
+            200: messageSchema,
+            400: errorSchema
+          }
         }
       )
   )
