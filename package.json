@@ -6,17 +6,20 @@
     "dev": "bun run --watch src/index.ts",
     "start": "NODE_ENV=production bun src/index.ts",
     "test": "bun test",
-    "reset:db": "bunx prisma migrate reset && bunx prisma db seed"
+    "db:reset": "bunx prisma migrate reset",
+    "db:seed": "bunx prisma db seed"
   },
   "dependencies": {
-    "@elysiajs/swagger": "^1.2.0",
-    "@prisma/client": "^5.22.0",
+    "@elysiajs/cookie": "^0.8.0",
+    "@elysiajs/jwt": "^1.2.0",
+    "@elysiajs/swagger": "^1.2.2",
+    "@prisma/client": "^6.4.1",
     "dayjs": "^1.11.13",
     "elysia": "latest"
   },
   "devDependencies": {
     "bun-types": "latest",
-    "prisma": "^5.22.0"
+    "prisma": "^6.4.1"
   },
   "module": "src/index.js",
   "prisma": {

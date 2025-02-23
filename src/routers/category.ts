@@ -1,7 +1,5 @@
 import { Elysia, t } from 'elysia';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib';
 
 export const categoryRouter = new Elysia({ prefix: '/api/categories' })
   .get(

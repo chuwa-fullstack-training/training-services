@@ -1,32 +1,11 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/lib';
 
 async function createUser() {
-  await prisma.user.createMany({
-    data: [
-      {
-        email: 'test1@test.com',
-        password: 'password'
-      },
-      {
-        email: 'test2@test.com',
-        password: 'password'
-      },
-      {
-        email: 'aaron@test.com',
-        password: 'password'
-      },
-      {
-        email: 'alex@test.com',
-        password: 'password'
-      },
-      {
-        email: 'jason@test.com',
-        password: 'password'
-      }
-    ]
-  });
+  await prisma.user.signUp('test1@test.com', 'password');
+  await prisma.user.signUp('test2@test.com', 'password');
+  await prisma.user.signUp('aaron@test.com', 'password');
+  await prisma.user.signUp('alex@test.com', 'password');
+  await prisma.user.signUp('jason@test.com', 'password');
 }
 
 async function createCategory() {

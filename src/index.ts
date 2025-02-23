@@ -1,7 +1,7 @@
-import { Elysia, t } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
-import { todoRouter } from './routers/todo';
+import { Elysia } from 'elysia';
 import { categoryRouter } from './routers/category';
+import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
 
 const app = new Elysia()
