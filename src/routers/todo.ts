@@ -20,6 +20,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       }));
     },
     {
+      detail: {
+        tags: ['Todo']
+      },
       query: t.Object({
         userId: t.Optional(t.String()),
         categoryId: t.Optional(t.Number())
@@ -52,6 +55,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       };
     },
     {
+      detail: {
+        tags: ['Todo']
+      },
       params: t.Object({ id: t.String() }),
       response: t.Object({
         id: t.String(),
@@ -87,6 +93,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       });
     },
     {
+      detail: {
+        tags: ['Todo']
+      },
       body: t.Object({
         title: t.String(),
         completed: t.Optional(t.Boolean()),
@@ -113,6 +122,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       };
     },
     {
+      detail: {
+        tags: ['Todo']
+      },
       body: t.Object({
         title: t.Optional(t.String()),
         completed: t.Optional(t.Boolean()),
@@ -143,6 +155,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
       }
     },
     {
+      detail: {
+        tags: ['Todo']
+      },
       params: t.Object({
         id: t.String()
       })

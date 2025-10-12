@@ -51,6 +51,9 @@ export const userRouter = new Elysia()
           });
         },
         {
+          detail: {
+            tags: ['Auth']
+          },
           body: t.Object({
             email: t.String({ format: 'email', error: 'Invalid email' }),
             password: t.String({
@@ -86,6 +89,9 @@ export const userRouter = new Elysia()
           }
         },
         {
+          detail: {
+            tags: ['Auth']
+          },
           body: t.Object({
             email: t.String({ format: 'email', error: 'Invalid email' }),
             password: t.String({
@@ -112,6 +118,9 @@ export const userRouter = new Elysia()
           return users;
         },
         {
+          detail: {
+            tags: ['User']
+          },
           response: t.Array(
             t.Object({
               id: t.String(),
@@ -135,6 +144,9 @@ export const userRouter = new Elysia()
           return user;
         },
         {
+          detail: {
+            tags: ['User']
+          },
           params: t.Object({
             id: t.String()
           }),

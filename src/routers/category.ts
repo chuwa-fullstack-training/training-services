@@ -10,6 +10,9 @@ export const categoryRouter = new Elysia({ prefix: '/api/categories' })
       });
     },
     {
+      detail: {
+        tags: ['Category']
+      },
       response: t.Array(
         t.Object({
           id: t.Number(),
@@ -30,6 +33,9 @@ export const categoryRouter = new Elysia({ prefix: '/api/categories' })
       return category;
     },
     {
+      detail: {
+        tags: ['Category']
+      },
       response: t.Union([
         t.Null(),
         t.Object({
