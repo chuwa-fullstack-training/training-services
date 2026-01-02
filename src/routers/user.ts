@@ -1,8 +1,10 @@
 import { jwt } from '@elysiajs/jwt';
+import { cookie } from '@elysiajs/cookie';
 import { Elysia, t } from 'elysia';
 import { prisma } from '../lib';
 import { UserAlreadyExistsError } from '../lib/errors';
 import { errorSchema, message, messageSchema } from '../lib/message';
+import { authMiddleware } from '../lib/auth';
 
 export const userRouter = new Elysia()
   .use(
@@ -11,6 +13,7 @@ export const userRouter = new Elysia()
       secret: Bun.env.JWT_SECRET!
     })
   )
+  .use(cookie())
   .group('/api/auth', app =>
     app
       .onError(({ code, error }) => {
@@ -27,7 +30,7 @@ export const userRouter = new Elysia()
       })
       .post(
         '/login',
-        async ({ body, jwt, error }) => {
+        async ({ body, jwt, error, cookie }) => {
           const { email, password } = body;
           const user = await prisma.user.findUnique({ where: { email } });
           if (!user) {
@@ -45,9 +48,23 @@ export const userRouter = new Elysia()
             });
           }
           const token = await jwt.sign({ id: user.id });
+
+          // Set cookie for browser-based auth
+          cookie.token = {
+            value: token,
+            httpOnly: true,
+            maxAge: 7 * 24 * 60 * 60, // 7 days
+            path: '/',
+            sameSite: 'lax'
+          };
+
           return message('Login successful', {
             status: 'success',
-            data: { token }
+            data: {
+              token,
+              userId: user.id,
+              email: user.email
+            }
           });
         },
         {
@@ -109,43 +126,133 @@ export const userRouter = new Elysia()
   )
   .group('/api/users', app =>
     app
+      .use(authMiddleware)
       .get(
         '/',
         async () => {
           const users = await prisma.user.findMany({
-            select: { id: true, email: true, todos: true, posts: true }
+            select: {
+              id: true,
+              email: true,
+              _count: {
+                select: { todos: true, posts: true }
+              }
+            }
           });
           return users;
         },
         {
           detail: {
-            tags: ['User']
+            tags: ['User'],
+            description: 'Get all users (requires authentication)',
+            security: [{ bearerAuth: [] }]
           },
           response: t.Array(
             t.Object({
               id: t.String(),
               email: t.String(),
-              todos: t.Array(t.Object({ id: t.String() })),
-              posts: t.Array(t.Object({ id: t.String() }))
+              _count: t.Object({
+                todos: t.Number(),
+                posts: t.Number()
+              })
             })
           )
         }
       )
       .get(
-        '/:id',
-        async ({ params }) => {
+        '/me',
+        async ({ userId }) => {
           const user = await prisma.user.findUnique({
-            where: { id: params.id },
-            include: {
-              todos: true,
-              posts: true
+            where: { id: userId },
+            select: {
+              id: true,
+              email: true,
+              todos: {
+                select: {
+                  id: true,
+                  title: true,
+                  completed: true,
+                  categoryId: true
+                }
+              },
+              posts: {
+                select: {
+                  id: true,
+                  title: true,
+                  published: true
+                }
+              }
             }
           });
           return user;
         },
         {
           detail: {
-            tags: ['User']
+            tags: ['User'],
+            description: 'Get current authenticated user profile',
+            security: [{ bearerAuth: [] }]
+          },
+          response: t.Union([
+            t.Null(),
+            t.Object({
+              id: t.String(),
+              email: t.String(),
+              todos: t.Array(
+                t.Object({
+                  id: t.String(),
+                  title: t.String(),
+                  completed: t.Boolean(),
+                  categoryId: t.Number()
+                })
+              ),
+              posts: t.Array(
+                t.Object({
+                  id: t.String(),
+                  title: t.String(),
+                  published: t.Boolean()
+                })
+              )
+            })
+          ])
+        }
+      )
+      .get(
+        '/:id',
+        async ({ params, userId, error }) => {
+          // Users can only view their own full profile
+          if (params.id !== userId) {
+            return error(403, { message: 'Access denied' });
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { id: params.id },
+            select: {
+              id: true,
+              email: true,
+              todos: {
+                select: {
+                  id: true,
+                  title: true,
+                  completed: true,
+                  categoryId: true
+                }
+              },
+              posts: {
+                select: {
+                  id: true,
+                  title: true,
+                  published: true
+                }
+              }
+            }
+          });
+          return user;
+        },
+        {
+          detail: {
+            tags: ['User'],
+            description: 'Get user by ID (can only access own profile)',
+            security: [{ bearerAuth: [] }]
           },
           params: t.Object({
             id: t.String()
@@ -155,9 +262,21 @@ export const userRouter = new Elysia()
             t.Object({
               id: t.String(),
               email: t.String(),
-              password: t.String(),
-              todos: t.Array(t.Object({ id: t.String() })),
-              posts: t.Array(t.Object({ id: t.String() }))
+              todos: t.Array(
+                t.Object({
+                  id: t.String(),
+                  title: t.String(),
+                  completed: t.Boolean(),
+                  categoryId: t.Number()
+                })
+              ),
+              posts: t.Array(
+                t.Object({
+                  id: t.String(),
+                  title: t.String(),
+                  published: t.Boolean()
+                })
+              )
             })
           ])
         }

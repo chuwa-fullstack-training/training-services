@@ -1,14 +1,44 @@
 import { Elysia, t } from 'elysia';
+import { jwt } from '@elysiajs/jwt';
+import { cookie } from '@elysiajs/cookie';
 import { formatDate, prisma } from '../lib';
 
 export const todoRouter = new Elysia({ prefix: '/api/todos' })
+  .use(jwt({ name: 'jwt', secret: Bun.env.JWT_SECRET! }))
+  .use(cookie())
+  .resolve(async ({ jwt, cookie, headers, set }) => {
+    const authHeader = headers['authorization'];
+    let token: string | undefined;
+
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else {
+      token = cookie.token?.value as string | undefined;
+    }
+
+    if (!token) {
+      set.status = 401;
+      throw new Error('Authentication required');
+    }
+
+    const payload = await jwt.verify(token);
+    if (!payload || typeof payload.id !== 'string') {
+      set.status = 401;
+      throw new Error('Invalid or expired token');
+    }
+
+    return {
+      userId: payload.id as string
+    };
+  })
   .get(
     '/',
-    async ({ query }) => {
-      const { userId, categoryId } = query;
+    async ({ userId, query }) => {
+      // Users can only see their own todos
+      const { categoryId} = query;
       const todos = await prisma.todo.findMany({
         where: {
-          userId: userId ? userId : undefined,
+          userId: userId,
           categoryId: categoryId ? categoryId : undefined
         }
       });
@@ -21,10 +51,11 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
     },
     {
       detail: {
-        tags: ['Todo']
+        tags: ['Todo'],
+        description: 'Get all todos for the authenticated user',
+        security: [{ bearerAuth: [] }]
       },
       query: t.Object({
-        userId: t.Optional(t.String()),
         categoryId: t.Optional(t.Number())
       }),
       response: t.Array(
@@ -42,11 +73,20 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
   )
   .get(
     '/:id',
-    async ({ params }) => {
+    async ({ params, userId, set }) => {
       const todo = await prisma.todo.findUnique({ where: { id: params.id } });
+
       if (!todo) {
+        set.status = 404;
         throw new Error('Todo not found');
       }
+
+      // Authorization: users can only access their own todos
+      if (todo.userId !== userId) {
+        set.status = 403;
+        throw new Error('Access denied');
+      }
+
       return {
         ...todo,
         userId: todo.userId ?? '',
@@ -56,7 +96,9 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
     },
     {
       detail: {
-        tags: ['Todo']
+        tags: ['Todo'],
+        description: 'Get a specific todo by ID (must be owned by authenticated user)',
+        security: [{ bearerAuth: [] }]
       },
       params: t.Object({ id: t.String() }),
       response: t.Object({
@@ -72,48 +114,28 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
   )
   .post(
     '/',
-    async ({ body, query }) => {
-      const { categoryId } = body;
-      const { userId } = query;
-      if (!userId) {
-        throw new Error('No user id provided');
-      }
+    async ({ body, userId, set }) => {
+      // Get categoryId from body or use default
+      let categoryId = body.categoryId;
+
       if (!categoryId) {
         const category = await prisma.category.findFirst();
-        if (!category) throw new Error('No category');
-        body.categoryId = category.id;
+        if (!category) {
+          set.status = 400;
+          throw new Error('No categories available. Please create a category first.');
+        }
+        categoryId = category.id;
       }
-      return await prisma.todo.create({
+
+      const todo = await prisma.todo.create({
         data: {
           title: body.title,
-          completed: body.completed,
-          categoryId: +body.categoryId!,
+          completed: body.completed ?? false,
+          categoryId: categoryId,
           userId: userId
         }
       });
-    },
-    {
-      detail: {
-        tags: ['Todo']
-      },
-      body: t.Object({
-        title: t.String(),
-        completed: t.Optional(t.Boolean()),
-        categoryId: t.Optional(t.Numeric())
-      }),
-      query: t.Object({
-        userId: t.Optional(t.String())
-      })
-    }
-  )
-  .put(
-    '/:id',
-    async ({ body, params }) => {
-      // update a todo
-      const todo = await prisma.todo.update({
-        where: { id: params.id },
-        data: body
-      });
+
       return {
         ...todo,
         userId: todo.userId ?? '',
@@ -123,10 +145,66 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
     },
     {
       detail: {
-        tags: ['Todo']
+        tags: ['Todo'],
+        description: 'Create a new todo for the authenticated user',
+        security: [{ bearerAuth: [] }]
       },
       body: t.Object({
-        title: t.Optional(t.String()),
+        title: t.String({ minLength: 1, maxLength: 200 }),
+        completed: t.Optional(t.Boolean()),
+        categoryId: t.Optional(t.Number())
+      }),
+      response: t.Object({
+        id: t.String(),
+        title: t.String(),
+        completed: t.Boolean(),
+        categoryId: t.Number(),
+        userId: t.String(),
+        createdAt: t.String(),
+        updatedAt: t.String()
+      })
+    }
+  )
+  .put(
+    '/:id',
+    async ({ body, params, userId, set }) => {
+      // First check if todo exists and belongs to user
+      const existingTodo = await prisma.todo.findUnique({
+        where: { id: params.id }
+      });
+
+      if (!existingTodo) {
+        set.status = 404;
+        throw new Error('Todo not found');
+      }
+
+      // Authorization: users can only update their own todos
+      if (existingTodo.userId !== userId) {
+        set.status = 403;
+        throw new Error('Access denied');
+      }
+
+      // Update the todo
+      const todo = await prisma.todo.update({
+        where: { id: params.id },
+        data: body
+      });
+
+      return {
+        ...todo,
+        userId: todo.userId ?? '',
+        createdAt: formatDate(todo.createdAt),
+        updatedAt: formatDate(todo.updatedAt)
+      };
+    },
+    {
+      detail: {
+        tags: ['Todo'],
+        description: 'Update a todo (must be owned by authenticated user)',
+        security: [{ bearerAuth: [] }]
+      },
+      body: t.Object({
+        title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
         completed: t.Optional(t.Boolean()),
         categoryId: t.Optional(t.Number())
       }),
@@ -146,19 +224,42 @@ export const todoRouter = new Elysia({ prefix: '/api/todos' })
   )
   .delete(
     '/:id',
-    async ({ params, error }) => {
-      // delete a todo
-      try {
-        return await prisma.todo.delete({ where: { id: params.id } });
-      } catch (err) {
-        return error(400, { error: 'Todo not found' });
+    async ({ params, userId, set }) => {
+      // First check if todo exists and belongs to user
+      const existingTodo = await prisma.todo.findUnique({
+        where: { id: params.id }
+      });
+
+      if (!existingTodo) {
+        set.status = 404;
+        throw new Error('Todo not found');
       }
+
+      // Authorization: users can only delete their own todos
+      if (existingTodo.userId !== userId) {
+        set.status = 403;
+        throw new Error('Access denied');
+      }
+
+      // Delete the todo
+      await prisma.todo.delete({ where: { id: params.id } });
+
+      return {
+        message: 'Todo deleted successfully',
+        id: params.id
+      };
     },
     {
       detail: {
-        tags: ['Todo']
+        tags: ['Todo'],
+        description: 'Delete a todo (must be owned by authenticated user)',
+        security: [{ bearerAuth: [] }]
       },
       params: t.Object({
+        id: t.String()
+      }),
+      response: t.Object({
+        message: t.String(),
         id: t.String()
       })
     }
