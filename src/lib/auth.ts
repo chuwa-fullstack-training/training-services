@@ -1,71 +1,82 @@
-import { Elysia } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
-import { cookie } from '@elysiajs/cookie';
+import { createMiddleware } from 'hono/factory';
+import { sign, verify } from 'hono/jwt';
+import { getCookie } from 'hono/cookie';
+
+const JWT_SECRET = Bun.env.JWT_SECRET!;
+
+// Type for authenticated context
+type AuthVariables = {
+  userId: string;
+};
 
 /**
- * Authentication middleware for Elysia
- * Verifies JWT tokens and requires authentication
+ * Required authentication middleware
+ * Injects userId into context or returns 401
  */
-export const authMiddleware = new Elysia({ name: 'auth' })
-  .use(jwt({ name: 'jwt', secret: Bun.env.JWT_SECRET! }))
-  .use(cookie())
-  .resolve(async ({ jwt, cookie, headers, set }) => {
-    const authHeader = headers['authorization'];
+export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
+  // Try Authorization header first
+  const authHeader = c.req.header('Authorization');
+  let token: string | undefined;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else {
+    // Fall back to cookie
+    token = getCookie(c, 'token');
+  }
+
+  if (!token) {
+    return c.json({ message: 'Authentication required' }, 401);
+  }
+
+  try {
+    const payload = await verify(token, JWT_SECRET);
+
+    if (!payload || typeof payload.id !== 'string') {
+      return c.json({ message: 'Invalid or expired token' }, 401);
+    }
+
+    // Set userId in context
+    c.set('userId', payload.id as string);
+    await next();
+  } catch (error) {
+    return c.json({ message: 'Invalid or expired token' }, 401);
+  }
+});
+
+/**
+ * Optional authentication middleware
+ * Sets userId if authenticated, but doesn't require it
+ */
+export const optionalAuth = createMiddleware<{ Variables: Partial<AuthVariables> }>(
+  async (c, next) => {
+    const authHeader = c.req.header('Authorization');
     let token: string | undefined;
 
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.substring(7);
     } else {
-      token = cookie.token?.value as string | undefined;
+      token = getCookie(c, 'token');
     }
 
-    if (!token) {
-      set.status = 401;
-      throw new Error('Authentication required');
+    if (token) {
+      try {
+        const payload = await verify(token, JWT_SECRET);
+        if (payload && typeof payload.id === 'string') {
+          c.set('userId', payload.id as string);
+        }
+      } catch {
+        // Silently ignore invalid tokens for optional auth
+      }
     }
 
-    const payload = await jwt.verify(token);
-    if (!payload || typeof payload.id !== 'string') {
-      set.status = 401;
-      throw new Error('Invalid or expired token');
-    }
-
-    return {
-      userId: payload.id as string
-    };
-  });
+    await next();
+  }
+);
 
 /**
- * Optional authentication - provides userId if authenticated, but doesn't require it
+ * Helper to sign JWT tokens
  */
-export const optionalAuth = new Elysia({ name: 'optional-auth' })
-  .use(
-    jwt({
-      name: 'jwt',
-      secret: Bun.env.JWT_SECRET!
-    })
-  )
-  .use(cookie())
-  .derive(async ({ jwt, cookie, headers }) => {
-    const authHeader = headers['authorization'];
-    let token: string | undefined;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else {
-      token = cookie.token?.value as string | undefined;
-    }
-
-    if (!token) {
-      return { userId: undefined };
-    }
-
-    const payload = await jwt.verify(token);
-    if (!payload || typeof payload.id !== 'string') {
-      return { userId: undefined };
-    }
-
-    return {
-      userId: payload.id as string
-    };
-  });
+export const signToken = async (userId: string): Promise<string> => {
+  return await sign({ id: userId }, JWT_SECRET);
+};

@@ -1,284 +1,345 @@
-import { jwt } from '@elysiajs/jwt';
-import { cookie } from '@elysiajs/cookie';
-import { Elysia, t } from 'elysia';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { setCookie } from 'hono/cookie';
 import { prisma } from '../lib';
+import { message, messageSchema, errorSchema } from '../lib/message';
+import { authMiddleware, signToken } from '../lib/auth';
 import { UserAlreadyExistsError } from '../lib/errors';
-import { errorSchema, message, messageSchema } from '../lib/message';
-import { authMiddleware } from '../lib/auth';
+import { logger, logAuth, logError } from '../lib/logger';
 
-export const userRouter = new Elysia()
-  .use(
-    jwt({
-      name: 'jwt',
-      secret: Bun.env.JWT_SECRET!
+export const userRouter = new OpenAPIHono();
+
+// Zod schemas
+const LoginSchema = z.object({
+  email: z.email({ message: 'Invalid email' }),
+  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters'),
+});
+
+const SignupSchema = z.object({
+  email: z.email({ message: 'Invalid email' }),
+  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters'),
+});
+
+const LoginResponseSchema = z.object({
+  message: z.string(),
+  status: z.literal('success'),
+  data: z.object({
+    token: z.string(),
+    userId: z.string(),
+    email: z.string(),
+  }),
+});
+
+const UserProfileSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  todos: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      completed: z.boolean(),
+      categoryId: z.number(),
     })
-  )
-  .use(cookie())
-  .group('/api/auth', app =>
-    app
-      .onError(({ code, error }) => {
-        if (code === 'VALIDATION') {
-          return {
-            message: 'Validation error',
-            data: error.all
-          };
-        }
-        return {
-          message: 'An unexpected error occurred',
-          data: error
-        };
-      })
-      .post(
-        '/login',
-        async ({ body, jwt, error, cookie }) => {
-          const { email, password } = body;
-          const user = await prisma.user.findUnique({ where: { email } });
-          if (!user) {
-            return error(400, {
-              message: 'User not found'
-            });
-          }
-          const isPasswordValid = await Bun.password.verify(
-            password,
-            user.password
-          );
-          if (!isPasswordValid) {
-            return error(400, {
-              message: 'Invalid password'
-            });
-          }
-          const token = await jwt.sign({ id: user.id });
+  ),
+  posts: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      published: z.boolean(),
+    })
+  ),
+});
 
-          // Set cookie for browser-based auth
-          cookie.token = {
-            value: token,
-            httpOnly: true,
-            maxAge: 7 * 24 * 60 * 60, // 7 days
-            path: '/',
-            sameSite: 'lax'
-          };
+// POST /api/auth/login
+const loginRoute = createRoute({
+  method: 'post',
+  path: '/auth/login',
+  tags: ['Auth'],
+  summary: 'User login',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: LoginSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Login successful',
+      content: {
+        'application/json': {
+          schema: LoginResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: 'Invalid credentials',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
+  },
+});
 
-          return message('Login successful', {
-            status: 'success',
-            data: {
-              token,
-              userId: user.id,
-              email: user.email
-            }
-          });
-        },
-        {
-          detail: {
-            tags: ['Auth']
-          },
-          body: t.Object({
-            email: t.String({ format: 'email', error: 'Invalid email' }),
-            password: t.String({
-              minLength: 8,
-              maxLength: 16,
-              error: 'Password must be between 8 and 16 characters long'
-            })
-          }),
-          response: {
-            200: messageSchema,
-            400: errorSchema
-          }
-        }
-      )
-      .post(
-        '/signup',
-        async ({ body, error }) => {
-          try {
-            const { email, password } = body;
-            await prisma.user.signUp(email, password);
-            return message('User created successfully');
-          } catch (e) {
-            if (e instanceof UserAlreadyExistsError) {
-              return error(400, {
-                message: e.message,
-                data: e.details
-              });
-            }
-            return error(400, {
-              message: 'User creation failed',
-              data: e
-            });
-          }
-        },
-        {
-          detail: {
-            tags: ['Auth']
-          },
-          body: t.Object({
-            email: t.String({ format: 'email', error: 'Invalid email' }),
-            password: t.String({
-              minLength: 8,
-              maxLength: 16,
-              error: 'Password must be between 8 and 16 characters long'
-            })
-          }),
-          response: {
-            200: messageSchema,
-            400: errorSchema
-          }
-        }
-      )
-  )
-  .group('/api/users', app =>
-    app
-      .use(authMiddleware)
-      .get(
-        '/',
-        async () => {
-          const users = await prisma.user.findMany({
-            select: {
-              id: true,
-              email: true,
-              _count: {
-                select: { todos: true, posts: true }
-              }
-            }
-          });
-          return users;
-        },
-        {
-          detail: {
-            tags: ['User'],
-            description: 'Get all users (requires authentication)',
-            security: [{ bearerAuth: [] }]
-          },
-          response: t.Array(
-            t.Object({
-              id: t.String(),
-              email: t.String(),
-              _count: t.Object({
-                todos: t.Number(),
-                posts: t.Number()
-              })
-            })
-          )
-        }
-      )
-      .get(
-        '/me',
-        async ({ userId }) => {
-          const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-              id: true,
-              email: true,
-              todos: {
-                select: {
-                  id: true,
-                  title: true,
-                  completed: true,
-                  categoryId: true
-                }
-              },
-              posts: {
-                select: {
-                  id: true,
-                  title: true,
-                  published: true
-                }
-              }
-            }
-          });
-          return user;
-        },
-        {
-          detail: {
-            tags: ['User'],
-            description: 'Get current authenticated user profile',
-            security: [{ bearerAuth: [] }]
-          },
-          response: t.Union([
-            t.Null(),
-            t.Object({
-              id: t.String(),
-              email: t.String(),
-              todos: t.Array(
-                t.Object({
-                  id: t.String(),
-                  title: t.String(),
-                  completed: t.Boolean(),
-                  categoryId: t.Number()
-                })
-              ),
-              posts: t.Array(
-                t.Object({
-                  id: t.String(),
-                  title: t.String(),
-                  published: t.Boolean()
-                })
-              )
-            })
-          ])
-        }
-      )
-      .get(
-        '/:id',
-        async ({ params, userId, error }) => {
-          // Users can only view their own full profile
-          if (params.id !== userId) {
-            return error(403, { message: 'Access denied' });
-          }
+userRouter.openapi(loginRoute, async (c) => {
+  const { email, password } = c.req.valid('json');
 
-          const user = await prisma.user.findUnique({
-            where: { id: params.id },
-            select: {
-              id: true,
-              email: true,
-              todos: {
-                select: {
-                  id: true,
-                  title: true,
-                  completed: true,
-                  categoryId: true
-                }
-              },
-              posts: {
-                select: {
-                  id: true,
-                  title: true,
-                  published: true
-                }
-              }
-            }
-          });
-          return user;
-        },
-        {
-          detail: {
-            tags: ['User'],
-            description: 'Get user by ID (can only access own profile)',
-            security: [{ bearerAuth: [] }]
-          },
-          params: t.Object({
-            id: t.String()
-          }),
-          response: t.Union([
-            t.Null(),
-            t.Object({
-              id: t.String(),
-              email: t.String(),
-              todos: t.Array(
-                t.Object({
-                  id: t.String(),
-                  title: t.String(),
-                  completed: t.Boolean(),
-                  categoryId: t.Number()
-                })
-              ),
-              posts: t.Array(
-                t.Object({
-                  id: t.String(),
-                  title: t.String(),
-                  published: t.Boolean()
-                })
-              )
-            })
-          ])
-        }
-      )
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    logAuth('auth_failed', undefined, email);
+    return c.json({ message: 'User not found' }, 400);
+  }
+
+  const isPasswordValid = await Bun.password.verify(password, user.password);
+  if (!isPasswordValid) {
+    logAuth('auth_failed', user.id, email);
+    return c.json({ message: 'Invalid password' }, 400);
+  }
+
+  const token = await signToken(user.id);
+
+  // Set HttpOnly cookie
+  setCookie(c, 'token', token, {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+    path: '/',
+    sameSite: 'Lax',
+  });
+
+  logAuth('login', user.id, email);
+
+  return c.json(
+    {
+      message: 'Login successful',
+      status: 'success' as const,
+      data: {
+        token,
+        userId: user.id,
+        email: user.email,
+      },
+    },
+    200
   );
+});
+
+// POST /api/auth/signup
+const signupRoute = createRoute({
+  method: 'post',
+  path: '/auth/signup',
+  tags: ['Auth'],
+  summary: 'User signup',
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: SignupSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'User created successfully',
+      content: {
+        'application/json': {
+          schema: messageSchema,
+        },
+      },
+    },
+    400: {
+      description: 'User creation failed',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
+  },
+});
+
+userRouter.openapi(signupRoute, async (c) => {
+  try {
+    const { email, password } = c.req.valid('json');
+    await prisma.user.signUp(email, password);
+    logAuth('signup', undefined, email);
+    return c.json(message('User created successfully'), 200);
+  } catch (e) {
+    if (e instanceof UserAlreadyExistsError) {
+      logAuth('auth_failed', undefined, (e as any).email);
+      return c.json(
+        {
+          message: e.message,
+          data: e.details,
+        },
+        400
+      );
+    }
+    logError(e as Error, { operation: 'signup' });
+    return c.json(
+      {
+        message: 'User creation failed',
+        data: e,
+      },
+      400
+    );
+  }
+});
+
+// GET /api/users - List all users (requires auth)
+const listUsersRoute = createRoute({
+  method: 'get',
+  path: '/users',
+  tags: ['User'],
+  summary: 'Get all users (requires authentication)',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  responses: {
+    200: {
+      description: 'List of users',
+      content: {
+        'application/json': {
+          schema: z.array(
+            z.object({
+              id: z.string(),
+              email: z.string(),
+              _count: z.object({
+                todos: z.number(),
+                posts: z.number(),
+              }),
+            })
+          ),
+        },
+      },
+    },
+  },
+});
+
+userRouter.openapi(listUsersRoute, async (c) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      email: true,
+      _count: {
+        select: { todos: true, posts: true },
+      },
+    },
+  });
+  return c.json(users, 200);
+});
+
+// GET /api/users/me - Get current user profile
+const getMeRoute = createRoute({
+  method: 'get',
+  path: '/users/me',
+  tags: ['User'],
+  summary: 'Get current authenticated user profile',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  responses: {
+    200: {
+      description: 'User profile',
+      content: {
+        'application/json': {
+          schema: UserProfileSchema.nullable(),
+        },
+      },
+    },
+  },
+});
+
+userRouter.openapi(getMeRoute, async (c) => {
+  const userId = c.get('userId');
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      todos: {
+        select: {
+          id: true,
+          title: true,
+          completed: true,
+          categoryId: true,
+        },
+      },
+      posts: {
+        select: {
+          id: true,
+          title: true,
+          published: true,
+        },
+      },
+    },
+  });
+  return c.json(user, 200);
+});
+
+// GET /api/users/:id - Get user by ID (must own profile)
+const getUserRoute = createRoute({
+  method: 'get',
+  path: '/users/{id}',
+  tags: ['User'],
+  summary: 'Get user by ID (can only access own profile)',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    params: z.object({
+      id: z.string(),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'User profile',
+      content: {
+        'application/json': {
+          schema: UserProfileSchema.nullable(),
+        },
+      },
+    },
+    403: {
+      description: 'Access denied',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
+  },
+});
+
+userRouter.openapi(getUserRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const userId = c.get('userId');
+
+  // Authorization check
+  if (id !== userId) {
+    return c.json({ message: 'Access denied' }, 403);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      email: true,
+      todos: {
+        select: {
+          id: true,
+          title: true,
+          completed: true,
+          categoryId: true,
+        },
+      },
+      posts: {
+        select: {
+          id: true,
+          title: true,
+          published: true,
+        },
+      },
+    },
+  });
+  return c.json(user, 200);
+});

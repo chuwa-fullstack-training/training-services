@@ -19,6 +19,7 @@
 # misc
 .DS_Store
 *.pem
+.serena
 
 # debug
 npm-debug.log*
@@ -43,7 +44,6 @@ yarn-error.log*
 package-lock.json
 **/*.bun
 
-CLAUDE.md
-.claude
-
+# Prisma
 /prisma/dev.db
+generated/prisma/
