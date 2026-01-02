@@ -1,266 +1,360 @@
-import { Elysia, t } from 'elysia';
-import { jwt } from '@elysiajs/jwt';
-import { cookie } from '@elysiajs/cookie';
-import { formatDate, prisma } from '../lib';
+import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { prisma, formatDate } from '../lib';
+import { authMiddleware } from '../lib/auth';
 
-export const todoRouter = new Elysia({ prefix: '/api/todos' })
-  .use(jwt({ name: 'jwt', secret: Bun.env.JWT_SECRET! }))
-  .use(cookie())
-  .resolve(async ({ jwt, cookie, headers, set }) => {
-    const authHeader = headers['authorization'];
-    let token: string | undefined;
+export const todoRouter = new OpenAPIHono();
 
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else {
-      token = cookie.token?.value as string | undefined;
-    }
+// Zod schemas
+const TodoSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  completed: z.boolean(),
+  categoryId: z.number(),
+  userId: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
 
-    if (!token) {
-      set.status = 401;
-      throw new Error('Authentication required');
-    }
+const CreateTodoSchema = z.object({
+  title: z.string().min(1).max(200),
+  completed: z.boolean().optional(),
+  categoryId: z.number().optional(),
+});
 
-    const payload = await jwt.verify(token);
-    if (!payload || typeof payload.id !== 'string') {
-      set.status = 401;
-      throw new Error('Invalid or expired token');
-    }
+const UpdateTodoSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  completed: z.boolean().optional(),
+  categoryId: z.number().optional(),
+});
 
-    return {
-      userId: payload.id as string
-    };
-  })
-  .get(
-    '/',
-    async ({ userId, query }) => {
-      // Users can only see their own todos
-      const { categoryId} = query;
-      const todos = await prisma.todo.findMany({
-        where: {
-          userId: userId,
-          categoryId: categoryId ? categoryId : undefined
-        }
-      });
-      return todos.map(todo => ({
-        ...todo,
-        userId: todo.userId ?? '',
-        createdAt: formatDate(todo.createdAt),
-        updatedAt: formatDate(todo.updatedAt)
-      }));
-    },
-    {
-      detail: {
-        tags: ['Todo'],
-        description: 'Get all todos for the authenticated user',
-        security: [{ bearerAuth: [] }]
+// GET /api/todos - List user's todos
+const listTodosRoute = createRoute({
+  method: 'get',
+  path: '/',
+  tags: ['Todo'],
+  summary: 'Get all todos for authenticated user',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    query: z.object({
+      categoryId: z.string().transform(Number).optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'List of todos',
+      content: {
+        'application/json': {
+          schema: z.array(TodoSchema),
+        },
       },
-      query: t.Object({
-        categoryId: t.Optional(t.Number())
-      }),
-      response: t.Array(
-        t.Object({
-          id: t.String(),
-          title: t.String(),
-          completed: t.Boolean(),
-          categoryId: t.Number(),
-          userId: t.String(),
-          createdAt: t.String(),
-          updatedAt: t.String()
-        })
-      )
-    }
-  )
-  .get(
-    '/:id',
-    async ({ params, userId, set }) => {
-      const todo = await prisma.todo.findUnique({ where: { id: params.id } });
-
-      if (!todo) {
-        set.status = 404;
-        throw new Error('Todo not found');
-      }
-
-      // Authorization: users can only access their own todos
-      if (todo.userId !== userId) {
-        set.status = 403;
-        throw new Error('Access denied');
-      }
-
-      return {
-        ...todo,
-        userId: todo.userId ?? '',
-        createdAt: formatDate(todo.createdAt),
-        updatedAt: formatDate(todo.updatedAt)
-      };
     },
-    {
-      detail: {
-        tags: ['Todo'],
-        description: 'Get a specific todo by ID (must be owned by authenticated user)',
-        security: [{ bearerAuth: [] }]
-      },
-      params: t.Object({ id: t.String() }),
-      response: t.Object({
-        id: t.String(),
-        title: t.String(),
-        completed: t.Boolean(),
-        categoryId: t.Number(),
-        userId: t.String(),
-        createdAt: t.String(),
-        updatedAt: t.String()
-      })
-    }
-  )
-  .post(
-    '/',
-    async ({ body, userId, set }) => {
-      // Get categoryId from body or use default
-      let categoryId = body.categoryId;
+  },
+});
 
-      if (!categoryId) {
-        const category = await prisma.category.findFirst();
-        if (!category) {
-          set.status = 400;
-          throw new Error('No categories available. Please create a category first.');
-        }
-        categoryId = category.id;
-      }
+todoRouter.openapi(listTodosRoute, async (c) => {
+  const userId = c.get('userId');
+  const query = c.req.valid('query');
 
-      const todo = await prisma.todo.create({
-        data: {
-          title: body.title,
-          completed: body.completed ?? false,
-          categoryId: categoryId,
-          userId: userId
-        }
-      });
-
-      return {
-        ...todo,
-        userId: todo.userId ?? '',
-        createdAt: formatDate(todo.createdAt),
-        updatedAt: formatDate(todo.updatedAt)
-      };
+  const todos = await prisma.todo.findMany({
+    where: {
+      userId,
+      categoryId: query.categoryId || undefined,
     },
-    {
-      detail: {
-        tags: ['Todo'],
-        description: 'Create a new todo for the authenticated user',
-        security: [{ bearerAuth: [] }]
-      },
-      body: t.Object({
-        title: t.String({ minLength: 1, maxLength: 200 }),
-        completed: t.Optional(t.Boolean()),
-        categoryId: t.Optional(t.Number())
-      }),
-      response: t.Object({
-        id: t.String(),
-        title: t.String(),
-        completed: t.Boolean(),
-        categoryId: t.Number(),
-        userId: t.String(),
-        createdAt: t.String(),
-        updatedAt: t.String()
-      })
-    }
-  )
-  .put(
-    '/:id',
-    async ({ body, params, userId, set }) => {
-      // First check if todo exists and belongs to user
-      const existingTodo = await prisma.todo.findUnique({
-        where: { id: params.id }
-      });
+  });
 
-      if (!existingTodo) {
-        set.status = 404;
-        throw new Error('Todo not found');
-      }
-
-      // Authorization: users can only update their own todos
-      if (existingTodo.userId !== userId) {
-        set.status = 403;
-        throw new Error('Access denied');
-      }
-
-      // Update the todo
-      const todo = await prisma.todo.update({
-        where: { id: params.id },
-        data: body
-      });
-
-      return {
-        ...todo,
-        userId: todo.userId ?? '',
-        createdAt: formatDate(todo.createdAt),
-        updatedAt: formatDate(todo.updatedAt)
-      };
-    },
-    {
-      detail: {
-        tags: ['Todo'],
-        description: 'Update a todo (must be owned by authenticated user)',
-        security: [{ bearerAuth: [] }]
-      },
-      body: t.Object({
-        title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
-        completed: t.Optional(t.Boolean()),
-        categoryId: t.Optional(t.Number())
-      }),
-      params: t.Object({
-        id: t.String()
-      }),
-      response: t.Object({
-        id: t.String(),
-        title: t.String(),
-        completed: t.Boolean(),
-        categoryId: t.Number(),
-        userId: t.String(),
-        createdAt: t.String(),
-        updatedAt: t.String()
-      })
-    }
-  )
-  .delete(
-    '/:id',
-    async ({ params, userId, set }) => {
-      // First check if todo exists and belongs to user
-      const existingTodo = await prisma.todo.findUnique({
-        where: { id: params.id }
-      });
-
-      if (!existingTodo) {
-        set.status = 404;
-        throw new Error('Todo not found');
-      }
-
-      // Authorization: users can only delete their own todos
-      if (existingTodo.userId !== userId) {
-        set.status = 403;
-        throw new Error('Access denied');
-      }
-
-      // Delete the todo
-      await prisma.todo.delete({ where: { id: params.id } });
-
-      return {
-        message: 'Todo deleted successfully',
-        id: params.id
-      };
-    },
-    {
-      detail: {
-        tags: ['Todo'],
-        description: 'Delete a todo (must be owned by authenticated user)',
-        security: [{ bearerAuth: [] }]
-      },
-      params: t.Object({
-        id: t.String()
-      }),
-      response: t.Object({
-        message: t.String(),
-        id: t.String()
-      })
-    }
+  return c.json(
+    todos.map((todo) => ({
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    })),
+    200
   );
+});
+
+// GET /api/todos/:id - Get single todo
+const getTodoRoute = createRoute({
+  method: 'get',
+  path: '/{id}',
+  tags: ['Todo'],
+  summary: 'Get todo by ID (must be owned by user)',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    params: z.object({
+      id: z.string(),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'Todo details',
+      content: {
+        'application/json': {
+          schema: TodoSchema,
+        },
+      },
+    },
+    403: {
+      description: 'Access denied',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+    404: {
+      description: 'Todo not found',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+  },
+});
+
+todoRouter.openapi(getTodoRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const userId = c.get('userId');
+
+  const todo = await prisma.todo.findUnique({ where: { id } });
+
+  if (!todo) {
+    return c.json({ message: 'Todo not found' }, 404);
+  }
+
+  if (todo.userId !== userId) {
+    return c.json({ message: 'Access denied' }, 403);
+  }
+
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
+});
+
+// POST /api/todos - Create todo
+const createTodoRoute = createRoute({
+  method: 'post',
+  path: '/',
+  tags: ['Todo'],
+  summary: 'Create new todo',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    body: {
+      content: {
+        'application/json': {
+          schema: CreateTodoSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Todo created',
+      content: {
+        'application/json': {
+          schema: TodoSchema,
+        },
+      },
+    },
+    400: {
+      description: 'No categories available',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+  },
+});
+
+todoRouter.openapi(createTodoRoute, async (c) => {
+  const userId = c.get('userId');
+  const body = c.req.valid('json');
+
+  let categoryId = body.categoryId;
+
+  if (!categoryId) {
+    const category = await prisma.category.findFirst();
+    if (!category) {
+      return c.json({ message: 'No categories available. Please create a category first.' }, 400);
+    }
+    categoryId = category.id;
+  }
+
+  const todo = await prisma.todo.create({
+    data: {
+      title: body.title,
+      completed: body.completed ?? false,
+      categoryId,
+      userId,
+    },
+  });
+
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
+});
+
+// PUT /api/todos/:id - Update todo
+const updateTodoRoute = createRoute({
+  method: 'put',
+  path: '/{id}',
+  tags: ['Todo'],
+  summary: 'Update todo (must be owned by user)',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    params: z.object({
+      id: z.string(),
+    }),
+    body: {
+      content: {
+        'application/json': {
+          schema: UpdateTodoSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Todo updated',
+      content: {
+        'application/json': {
+          schema: TodoSchema,
+        },
+      },
+    },
+    403: {
+      description: 'Access denied',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+    404: {
+      description: 'Todo not found',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+  },
+});
+
+todoRouter.openapi(updateTodoRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const userId = c.get('userId');
+  const body = c.req.valid('json');
+
+  const existingTodo = await prisma.todo.findUnique({ where: { id } });
+
+  if (!existingTodo) {
+    return c.json({ message: 'Todo not found' }, 404);
+  }
+
+  if (existingTodo.userId !== userId) {
+    return c.json({ message: 'Access denied' }, 403);
+  }
+
+  const todo = await prisma.todo.update({
+    where: { id },
+    data: body,
+  });
+
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
+});
+
+// DELETE /api/todos/:id - Delete todo
+const deleteTodoRoute = createRoute({
+  method: 'delete',
+  path: '/{id}',
+  tags: ['Todo'],
+  summary: 'Delete todo (must be owned by user)',
+  security: [{ Bearer: [] }],
+  middleware: authMiddleware,
+  request: {
+    params: z.object({
+      id: z.string(),
+    }),
+  },
+  responses: {
+    200: {
+      description: 'Todo deleted',
+      content: {
+        'application/json': {
+          schema: z.object({
+            message: z.string(),
+            id: z.string(),
+          }),
+        },
+      },
+    },
+    403: {
+      description: 'Access denied',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+    404: {
+      description: 'Todo not found',
+      content: {
+        'application/json': {
+          schema: z.object({ message: z.string() }),
+        },
+      },
+    },
+  },
+});
+
+todoRouter.openapi(deleteTodoRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  const userId = c.get('userId');
+
+  const existingTodo = await prisma.todo.findUnique({ where: { id } });
+
+  if (!existingTodo) {
+    return c.json({ message: 'Todo not found' }, 404);
+  }
+
+  if (existingTodo.userId !== userId) {
+    return c.json({ message: 'Access denied' }, 403);
+  }
+
+  await prisma.todo.delete({ where: { id } });
+
+  return c.json(
+    {
+      message: 'Todo deleted successfully',
+      id,
+    },
+    200
+  );
+});

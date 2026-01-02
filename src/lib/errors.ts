@@ -21,7 +21,7 @@ export class UserError extends AppError {
 export class UserAlreadyExistsError extends UserError {
   constructor(email: string) {
     super('User with this email already exists', 'USER_ALREADY_EXISTS', {
-      email
+      email,
     });
   }
 }

@@ -1,4 +1,5 @@
 # Elysia → Hono Migration Workflow
+
 **Todo List API Service Framework Migration**
 
 **Estimated Total Time**: 13-18 hours
@@ -8,6 +9,7 @@
 ---
 
 ## Table of Contents
+
 1. [Prerequisites & Overview](#prerequisites--overview)
 2. [Phase 1: Foundation Setup](#phase-1-foundation-setup-2-3-hours)
 3. [Phase 2: Core Infrastructure Migration](#phase-2-core-infrastructure-migration-3-4-hours)
@@ -23,18 +25,19 @@
 
 ### Framework Comparison
 
-| Feature | Elysia | Hono | Migration Impact |
-|---------|--------|------|------------------|
-| **Routing** | `new Elysia()` | `new Hono()` | Low - Similar API |
-| **Validation** | TypeBox (`t.Object`) | Zod (`z.object`) | **High - Full rewrite** |
-| **JWT** | `@elysiajs/jwt` | `hono/jwt` | Medium - Different API |
-| **Cookies** | `@elysiajs/cookie` | `hono/cookie` | Low - Similar |
-| **OpenAPI** | `@elysiajs/swagger` | `@hono/zod-openapi` | **High - Different approach** |
-| **Middleware** | `.use()`, `.resolve()` | `.use()`, context | Medium - Pattern change |
-| **Error Handling** | `.onError()` | Middleware pattern | Medium |
-| **Type Safety** | Built-in | Zod inference | High - Schema rewrite |
+| Feature            | Elysia                 | Hono                | Migration Impact              |
+| ------------------ | ---------------------- | ------------------- | ----------------------------- |
+| **Routing**        | `new Elysia()`         | `new Hono()`        | Low - Similar API             |
+| **Validation**     | TypeBox (`t.Object`)   | Zod (`z.object`)    | **High - Full rewrite**       |
+| **JWT**            | `@elysiajs/jwt`        | `hono/jwt`          | Medium - Different API        |
+| **Cookies**        | `@elysiajs/cookie`     | `hono/cookie`       | Low - Similar                 |
+| **OpenAPI**        | `@elysiajs/swagger`    | `@hono/zod-openapi` | **High - Different approach** |
+| **Middleware**     | `.use()`, `.resolve()` | `.use()`, context   | Medium - Pattern change       |
+| **Error Handling** | `.onError()`           | Middleware pattern  | Medium                        |
+| **Type Safety**    | Built-in               | Zod inference       | High - Schema rewrite         |
 
 ### Current Features to Preserve
+
 ✅ JWT authentication with bcrypt password hashing
 ✅ Cookie-based and Bearer token auth
 ✅ Todo CRUD with user ownership
@@ -46,6 +49,7 @@
 ✅ Date formatting with dayjs
 
 ### Migration Strategy
+
 - **Incremental**: Migrate one router at a time
 - **Parallel**: Keep Elysia running until migration complete
 - **Testable**: Validate each phase before proceeding
@@ -88,6 +92,7 @@ mkdir -p src/hono-routers
 **File**: `tsconfig.json`
 
 Ensure compatibility:
+
 ```json
 {
   "compilerOptions": {
@@ -123,7 +128,7 @@ app.get('/', (c) => {
   return c.json({
     message: 'Todo List API - Hono Version',
     version: '2.0.0',
-    framework: 'Hono'
+    framework: 'Hono',
   });
 });
 
@@ -148,6 +153,7 @@ curl http://localhost:3001
 ```
 
 **Expected Response**:
+
 ```json
 {
   "message": "Todo List API - Hono Version",
@@ -157,6 +163,7 @@ curl http://localhost:3001
 ```
 
 **Success Criteria**:
+
 - ✅ Hono dependencies installed
 - ✅ Base app runs on port 3001
 - ✅ Health check endpoint responds
@@ -178,12 +185,12 @@ import { MessageResponse } from '../types';
 export const messageSchema = z.object({
   message: z.string(),
   status: z.enum(['success', 'info', 'warning', 'error']),
-  data: z.any().optional()
+  data: z.any().optional(),
 });
 
 export const errorSchema = z.object({
   message: z.string(),
-  data: z.any().optional()
+  data: z.any().optional(),
 });
 
 // Helper function (unchanged logic)
@@ -194,7 +201,7 @@ export const message = (
   return {
     message,
     status: options?.status ?? 'success',
-    ...((options?.data && { data: options.data }) || {})
+    ...((options?.data && { data: options.data }) || {}),
   };
 };
 ```
@@ -234,38 +241,36 @@ type AuthVariables = {
  * Required authentication middleware
  * Injects userId into context or returns 401
  */
-export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(
-  async (c, next) => {
-    // Try Authorization header first
-    const authHeader = c.req.header('Authorization');
-    let token: string | undefined;
+export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
+  // Try Authorization header first
+  const authHeader = c.req.header('Authorization');
+  let token: string | undefined;
 
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    } else {
-      // Fall back to cookie
-      token = getCookie(c, 'token');
-    }
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  } else {
+    // Fall back to cookie
+    token = getCookie(c, 'token');
+  }
 
-    if (!token) {
-      return c.json({ message: 'Authentication required' }, 401);
-    }
+  if (!token) {
+    return c.json({ message: 'Authentication required' }, 401);
+  }
 
-    try {
-      const payload = await verify(token, JWT_SECRET);
+  try {
+    const payload = await verify(token, JWT_SECRET);
 
-      if (!payload || typeof payload.id !== 'string') {
-        return c.json({ message: 'Invalid or expired token' }, 401);
-      }
-
-      // Set userId in context
-      c.set('userId', payload.id as string);
-      await next();
-    } catch (error) {
+    if (!payload || typeof payload.id !== 'string') {
       return c.json({ message: 'Invalid or expired token' }, 401);
     }
+
+    // Set userId in context
+    c.set('userId', payload.id as string);
+    await next();
+  } catch (error) {
+    return c.json({ message: 'Invalid or expired token' }, 401);
   }
-);
+});
 
 /**
  * Optional authentication middleware
@@ -352,7 +357,10 @@ export function createAuthRoute<T extends z.ZodType>(config: {
     query?: T;
     params?: T;
   };
-  responses: Record<number, { description: string; content: { 'application/json': { schema: T } } }>;
+  responses: Record<
+    number,
+    { description: string; content: { 'application/json': { schema: T } } }
+  >;
 }) {
   return createRoute({
     ...config,
@@ -362,6 +370,7 @@ export function createAuthRoute<T extends z.ZodType>(config: {
 ```
 
 **Success Criteria**:
+
 - ✅ All infrastructure files created
 - ✅ No compilation errors
 - ✅ Auth middleware logic matches Elysia version
@@ -383,7 +392,7 @@ import { prisma } from '../lib';
 const CategorySchema = z.object({
   id: z.number(),
   name: z.string(),
-  todos: z.array(z.object({ id: z.string() }))
+  todos: z.array(z.object({ id: z.string() })),
 });
 
 const CategoryArraySchema = z.array(CategorySchema);
@@ -410,7 +419,7 @@ const listCategoriesRoute = createRoute({
 
 categoryRouter.openapi(listCategoriesRoute, async (c) => {
   const categories = await prisma.category.findMany({
-    select: { id: true, name: true, todos: true }
+    select: { id: true, name: true, todos: true },
   });
   return c.json(categories, 200);
 });
@@ -442,13 +451,14 @@ categoryRouter.openapi(getCategoryRoute, async (c) => {
   const { id } = c.req.valid('param');
   const category = await prisma.category.findUnique({
     where: { id },
-    select: { id: true, name: true, todos: true }
+    select: { id: true, name: true, todos: true },
   });
   return c.json(category, 200);
 });
 ```
 
 **Validation**:
+
 ```bash
 # Test compilation
 bun run --bun src/hono-routers/category.ts
@@ -473,12 +483,12 @@ export const userRouter = new OpenAPIHono();
 // Zod schemas
 const LoginSchema = z.object({
   email: z.string().email({ message: 'Invalid email' }),
-  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters')
+  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters'),
 });
 
 const SignupSchema = z.object({
   email: z.string().email({ message: 'Invalid email' }),
-  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters')
+  password: z.string().min(8).max(16, 'Password must be between 8 and 16 characters'),
 });
 
 const LoginResponseSchema = z.object({
@@ -487,24 +497,28 @@ const LoginResponseSchema = z.object({
   data: z.object({
     token: z.string(),
     userId: z.string(),
-    email: z.string()
-  })
+    email: z.string(),
+  }),
 });
 
 const UserProfileSchema = z.object({
   id: z.string(),
   email: z.string(),
-  todos: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    completed: z.boolean(),
-    categoryId: z.number()
-  })),
-  posts: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    published: z.boolean()
-  }))
+  todos: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      completed: z.boolean(),
+      categoryId: z.number(),
+    })
+  ),
+  posts: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      published: z.boolean(),
+    })
+  ),
 });
 
 // POST /api/auth/login
@@ -565,14 +579,17 @@ userRouter.openapi(loginRoute, async (c) => {
     sameSite: 'Lax',
   });
 
-  return c.json(message('Login successful', {
-    status: 'success',
-    data: {
-      token,
-      userId: user.id,
-      email: user.email
-    }
-  }), 200);
+  return c.json(
+    message('Login successful', {
+      status: 'success',
+      data: {
+        token,
+        userId: user.id,
+        email: user.email,
+      },
+    }),
+    200
+  );
 });
 
 // POST /api/auth/signup
@@ -617,15 +634,21 @@ userRouter.openapi(signupRoute, async (c) => {
     return c.json(message('User created successfully'), 200);
   } catch (e) {
     if (e instanceof UserAlreadyExistsError) {
-      return c.json({
-        message: e.message,
-        data: e.details
-      }, 400);
+      return c.json(
+        {
+          message: e.message,
+          data: e.details,
+        },
+        400
+      );
     }
-    return c.json({
-      message: 'User creation failed',
-      data: e
-    }, 400);
+    return c.json(
+      {
+        message: 'User creation failed',
+        data: e,
+      },
+      400
+    );
   }
 });
 
@@ -641,14 +664,16 @@ const listUsersRoute = createRoute({
       description: 'List of users',
       content: {
         'application/json': {
-          schema: z.array(z.object({
-            id: z.string(),
-            email: z.string(),
-            _count: z.object({
-              todos: z.number(),
-              posts: z.number()
+          schema: z.array(
+            z.object({
+              id: z.string(),
+              email: z.string(),
+              _count: z.object({
+                todos: z.number(),
+                posts: z.number(),
+              }),
             })
-          })),
+          ),
         },
       },
     },
@@ -661,9 +686,9 @@ userRouter.openapi(listUsersRoute, authMiddleware, async (c) => {
       id: true,
       email: true,
       _count: {
-        select: { todos: true, posts: true }
-      }
-    }
+        select: { todos: true, posts: true },
+      },
+    },
   });
   return c.json(users, 200);
 });
@@ -699,17 +724,17 @@ userRouter.openapi(getMeRoute, authMiddleware, async (c) => {
           id: true,
           title: true,
           completed: true,
-          categoryId: true
-        }
+          categoryId: true,
+        },
       },
       posts: {
         select: {
           id: true,
           title: true,
-          published: true
-        }
-      }
-    }
+          published: true,
+        },
+      },
+    },
   });
   return c.json(user, 200);
 });
@@ -765,17 +790,17 @@ userRouter.openapi(getUserRoute, authMiddleware, async (c) => {
           id: true,
           title: true,
           completed: true,
-          categoryId: true
-        }
+          categoryId: true,
+        },
       },
       posts: {
         select: {
           id: true,
           title: true,
-          published: true
-        }
-      }
-    }
+          published: true,
+        },
+      },
+    },
   });
   return c.json(user, 200);
 });
@@ -800,19 +825,19 @@ const TodoSchema = z.object({
   categoryId: z.number(),
   userId: z.string(),
   createdAt: z.string(),
-  updatedAt: z.string()
+  updatedAt: z.string(),
 });
 
 const CreateTodoSchema = z.object({
   title: z.string().min(1).max(200),
   completed: z.boolean().optional(),
-  categoryId: z.number().optional()
+  categoryId: z.number().optional(),
 });
 
 const UpdateTodoSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   completed: z.boolean().optional(),
-  categoryId: z.number().optional()
+  categoryId: z.number().optional(),
 });
 
 // GET /api/todos - List user's todos
@@ -846,16 +871,19 @@ todoRouter.openapi(listTodosRoute, authMiddleware, async (c) => {
   const todos = await prisma.todo.findMany({
     where: {
       userId,
-      categoryId: query.categoryId || undefined
-    }
+      categoryId: query.categoryId || undefined,
+    },
   });
 
-  return c.json(todos.map(todo => ({
-    ...todo,
-    userId: todo.userId ?? '',
-    createdAt: formatDate(todo.createdAt),
-    updatedAt: formatDate(todo.updatedAt)
-  })), 200);
+  return c.json(
+    todos.map((todo) => ({
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    })),
+    200
+  );
 });
 
 // GET /api/todos/:id - Get single todo
@@ -912,12 +940,15 @@ todoRouter.openapi(getTodoRoute, authMiddleware, async (c) => {
     return c.json({ message: 'Access denied' }, 403);
   }
 
-  return c.json({
-    ...todo,
-    userId: todo.userId ?? '',
-    createdAt: formatDate(todo.createdAt),
-    updatedAt: formatDate(todo.updatedAt)
-  }, 200);
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
 });
 
 // POST /api/todos - Create todo
@@ -975,16 +1006,19 @@ todoRouter.openapi(createTodoRoute, authMiddleware, async (c) => {
       title: body.title,
       completed: body.completed ?? false,
       categoryId,
-      userId
-    }
+      userId,
+    },
   });
 
-  return c.json({
-    ...todo,
-    userId: todo.userId ?? '',
-    createdAt: formatDate(todo.createdAt),
-    updatedAt: formatDate(todo.updatedAt)
-  }, 200);
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
 });
 
 // PUT /api/todos/:id - Update todo
@@ -1051,15 +1085,18 @@ todoRouter.openapi(updateTodoRoute, authMiddleware, async (c) => {
 
   const todo = await prisma.todo.update({
     where: { id },
-    data: body
+    data: body,
   });
 
-  return c.json({
-    ...todo,
-    userId: todo.userId ?? '',
-    createdAt: formatDate(todo.createdAt),
-    updatedAt: formatDate(todo.updatedAt)
-  }, 200);
+  return c.json(
+    {
+      ...todo,
+      userId: todo.userId ?? '',
+      createdAt: formatDate(todo.createdAt),
+      updatedAt: formatDate(todo.updatedAt),
+    },
+    200
+  );
 });
 
 // DELETE /api/todos/:id - Delete todo
@@ -1081,7 +1118,7 @@ const deleteTodoRoute = createRoute({
         'application/json': {
           schema: z.object({
             message: z.string(),
-            id: z.string()
+            id: z.string(),
           }),
         },
       },
@@ -1121,14 +1158,18 @@ todoRouter.openapi(deleteTodoRoute, authMiddleware, async (c) => {
 
   await prisma.todo.delete({ where: { id } });
 
-  return c.json({
-    message: 'Todo deleted successfully',
-    id
-  }, 200);
+  return c.json(
+    {
+      message: 'Todo deleted successfully',
+      id,
+    },
+    200
+  );
 });
 ```
 
 **Success Criteria**:
+
 - ✅ All routers compile without errors
 - ✅ Feature parity with Elysia versions
 - ✅ Auth middleware properly integrated
@@ -1159,7 +1200,7 @@ app.use('*', cors());
 
 // Mount routers
 app.route('/api/categories', categoryRouter);
-app.route('/api', userRouter);  // Handles /api/auth/* and /api/users/*
+app.route('/api', userRouter); // Handles /api/auth/* and /api/users/*
 app.route('/api/todos', todoRouter);
 
 // Swagger UI
@@ -1167,14 +1208,16 @@ app.get('/swagger', swaggerUI({ url: '/openapi.json' }));
 
 // OpenAPI spec endpoint
 app.get('/openapi.json', (c) => {
-  return c.json(app.getOpenAPIDocument({
-    openapi: '3.0.0',
-    info: {
-      title: 'Todo List API',
-      version: '2.0.0',
-      description: 'Todo List Management API - Hono Framework',
-    },
-  }));
+  return c.json(
+    app.getOpenAPIDocument({
+      openapi: '3.0.0',
+      info: {
+        title: 'Todo List API',
+        version: '2.0.0',
+        description: 'Todo List Management API - Hono Framework',
+      },
+    })
+  );
 });
 
 // Health check
@@ -1183,7 +1226,7 @@ app.get('/', (c) => {
     message: 'Todo List API - Hono',
     version: '2.0.0',
     framework: 'Hono',
-    documentation: '/swagger'
+    documentation: '/swagger',
   });
 });
 
@@ -1215,6 +1258,7 @@ export default {
 ### Step 4.3: Manual Testing Checklist
 
 **Authentication Tests**:
+
 ```bash
 # 1. Signup
 curl -X POST http://localhost:3000/api/auth/signup \
@@ -1242,6 +1286,7 @@ curl http://localhost:3000/api/users/me \
 ```
 
 **Todo Tests**:
+
 ```bash
 # 1. List todos (should be empty)
 curl http://localhost:3000/api/todos \
@@ -1280,6 +1325,7 @@ curl -X DELETE http://localhost:3000/api/todos/$TODO_ID \
 ```
 
 **Category Tests**:
+
 ```bash
 # List categories
 curl http://localhost:3000/api/categories
@@ -1293,6 +1339,7 @@ curl http://localhost:3000/api/categories/1
 ```
 
 **Documentation Test**:
+
 ```bash
 # Open in browser
 open http://localhost:3000/swagger
@@ -1316,6 +1363,7 @@ open http://localhost:3000/swagger
 - [ ] ✅ Cookie-based auth works (test in browser)
 
 **Success Criteria**:
+
 - ✅ All manual tests pass
 - ✅ Feature parity with Elysia version
 - ✅ No regressions in functionality
@@ -1354,12 +1402,14 @@ mv src/lib/openapi.hono.ts src/lib/openapi.ts
 ### Step 5.3: Update Imports
 
 **Files to update**:
+
 - `src/routers/category.ts`
 - `src/routers/user.ts`
 - `src/routers/todo.ts`
 - `src/index.ts`
 
 Remove `.hono` from all imports:
+
 ```typescript
 // Before
 import { message } from '../lib/message.hono';
@@ -1378,6 +1428,7 @@ Update these sections:
 
 ```markdown
 ## Tech Stack
+
 - **Runtime**: Bun (replaces Node.js)
 - **Web Framework**: Hono (high-performance TypeScript framework) ← Changed
 - **ORM**: Prisma with SQLite
@@ -1388,7 +1439,9 @@ Update these sections:
 ## Key Patterns
 
 ### Router Organization
+
 Each router is a Hono instance with:
+
 - **Prefix**: Routes grouped by domain (e.g., `/api/todos`, `/api/auth`)
 - **Type Safety**: Request/response schemas defined with Zod ← Changed
 - **OpenAPI Integration**: Routes defined with @hono/zod-openapi ← Changed
@@ -1412,6 +1465,7 @@ open http://localhost:3000/swagger
 ```
 
 **Success Criteria**:
+
 - ✅ No Elysia dependencies in package.json
 - ✅ All old files removed
 - ✅ Production build works
@@ -1469,6 +1523,7 @@ bun remove hono zod @hono/zod-validator @hono/zod-openapi
 
 **Cause**: Dependencies not installed
 **Solution**:
+
 ```bash
 bun install
 # or
@@ -1479,11 +1534,12 @@ bun add hono zod @hono/zod-validator @hono/zod-openapi
 
 **Cause**: Schema definition mismatch
 **Solution**: Ensure Zod schema matches TypeScript type:
+
 ```typescript
 // Correct
 const schema = z.object({
   id: z.string(),
-  name: z.string()
+  name: z.string(),
 });
 
 type MyType = z.infer<typeof schema>; // Infer type from schema
@@ -1493,6 +1549,7 @@ type MyType = z.infer<typeof schema>; // Infer type from schema
 
 **Cause**: JWT_SECRET not set or different algorithm
 **Solution**:
+
 ```bash
 # Check .env file
 cat .env | grep JWT_SECRET
@@ -1505,6 +1562,7 @@ cat .env | grep JWT_SECRET
 
 **Cause**: Cookie options incorrect
 **Solution**:
+
 ```typescript
 import { setCookie } from 'hono/cookie';
 
@@ -1520,6 +1578,7 @@ setCookie(c, 'token', token, {
 
 **Cause**: Routes not registered with OpenAPIHono
 **Solution**:
+
 ```typescript
 // Use OpenAPIHono, not regular Hono
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -1534,6 +1593,7 @@ router.openapi(route, handler); // ← Correct
 
 **Cause**: Middleware not properly typed
 **Solution**:
+
 ```typescript
 import { createMiddleware } from 'hono/factory';
 
@@ -1541,19 +1601,18 @@ type AuthVariables = {
   userId: string;
 };
 
-export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(
-  async (c, next) => {
-    // ... auth logic
-    c.set('userId', userId); // Type-safe
-    await next();
-  }
-);
+export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(async (c, next) => {
+  // ... auth logic
+  c.set('userId', userId); // Type-safe
+  await next();
+});
 ```
 
 ### Issue 7: Request validation fails silently
 
 **Cause**: Missing validator middleware
 **Solution**:
+
 ```typescript
 import { zValidator } from '@hono/zod-validator';
 
@@ -1568,41 +1627,48 @@ app.post('/path', zValidator('json', schema), async (c) => {
 ## Migration Completion Checklist
 
 ### Pre-Migration
+
 - [ ] Backup current codebase (git commit)
 - [ ] Document current API behavior
 - [ ] Set up test environment
 
 ### Phase 1: Foundation
+
 - [ ] Install Hono dependencies
 - [ ] Create parallel structure
 - [ ] Base Hono app runs
 - [ ] Health check works
 
 ### Phase 2: Infrastructure
+
 - [ ] Message helpers converted
 - [ ] Auth middleware created
 - [ ] OpenAPI setup complete
 - [ ] No TypeScript errors
 
 ### Phase 3: Routers
+
 - [ ] Category router migrated
 - [ ] User router migrated
 - [ ] Todo router migrated
 - [ ] All routers compile
 
 ### Phase 4: Integration
+
 - [ ] Routers wired to app
 - [ ] Package scripts updated
 - [ ] All manual tests pass
 - [ ] Swagger UI works
 
 ### Phase 5: Cleanup
+
 - [ ] Elysia dependencies removed
 - [ ] Old files deleted
 - [ ] Documentation updated
 - [ ] Production build works
 
 ### Post-Migration
+
 - [ ] All features working
 - [ ] Performance acceptable
 - [ ] Documentation accurate
@@ -1628,6 +1694,7 @@ autocannon -c 100 -d 10 http://localhost:3000/api/categories
 ```
 
 **Expected Results**:
+
 - Similar or better performance with Hono
 - Lower memory usage
 - Comparable latency
@@ -1637,26 +1704,33 @@ autocannon -c 100 -d 10 http://localhost:3000/api/categories
 ## Next Steps After Migration
 
 1. **Add Rate Limiting**
+
    ```bash
    bun add @hono/rate-limiter
    ```
 
 2. **Add Request Logging**
+
    ```typescript
    import { logger } from 'hono/logger';
    app.use('*', logger());
    ```
 
 3. **Add CORS Configuration**
+
    ```typescript
    import { cors } from 'hono/cors';
-   app.use('*', cors({
-     origin: ['http://localhost:3000'],
-     credentials: true,
-   }));
+   app.use(
+     '*',
+     cors({
+       origin: ['http://localhost:3000'],
+       credentials: true,
+     })
+   );
    ```
 
 4. **Set Up Testing**
+
    ```bash
    bun add -d vitest @hono/testing
    ```
@@ -1670,16 +1744,17 @@ autocannon -c 100 -d 10 http://localhost:3000/api/categories
 
 ## Estimated Timeline Summary
 
-| Phase | Duration | Blocking? |
-|-------|----------|-----------|
-| Phase 1: Foundation | 2-3 hours | Yes |
-| Phase 2: Infrastructure | 3-4 hours | Yes |
-| Phase 3: Routers | 5-6 hours | Partially (can do incrementally) |
-| Phase 4: Integration | 2-3 hours | Yes |
-| Phase 5: Cleanup | 1-2 hours | No |
-| **Total** | **13-18 hours** | - |
+| Phase                   | Duration        | Blocking?                        |
+| ----------------------- | --------------- | -------------------------------- |
+| Phase 1: Foundation     | 2-3 hours       | Yes                              |
+| Phase 2: Infrastructure | 3-4 hours       | Yes                              |
+| Phase 3: Routers        | 5-6 hours       | Partially (can do incrementally) |
+| Phase 4: Integration    | 2-3 hours       | Yes                              |
+| Phase 5: Cleanup        | 1-2 hours       | No                               |
+| **Total**               | **13-18 hours** | -                                |
 
 **Recommended Schedule**:
+
 - **Day 1 (4 hours)**: Phases 1-2
 - **Day 2 (6 hours)**: Phase 3
 - **Day 3 (4 hours)**: Phases 4-5
@@ -1689,6 +1764,7 @@ autocannon -c 100 -d 10 http://localhost:3000/api/categories
 ## Success Metrics
 
 Migration is successful when:
+
 - ✅ **100% feature parity** with Elysia version
 - ✅ **All API endpoints** return correct responses
 - ✅ **Authentication flows** work (signup, login, protected routes)
@@ -1839,6 +1915,7 @@ Before starting the migration, ensure:
   - [ ] Configure server to listen on port 3000
 
 - [ ] **Step 4.2**: Update package.json scripts
+
   ```json
   {
     "scripts": {
@@ -1933,6 +2010,7 @@ Before starting the migration, ensure:
   - [ ] Delete `src/setup.ts` (empty file)
 
 - [ ] **Step 5.4**: Remove Elysia dependencies
+
   ```bash
   bun remove elysia @elysiajs/swagger @elysiajs/jwt @elysiajs/cookie
   ```
@@ -1957,22 +2035,29 @@ Before starting the migration, ensure:
   - [ ] Implement rate limiting:
     ```typescript
     import { rateLimiter } from 'hono-rate-limiter';
-    app.use('*', rateLimiter({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // limit each IP to 100 requests per windowMs
-    }));
+    app.use(
+      '*',
+      rateLimiter({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        max: 100, // limit each IP to 100 requests per windowMs
+      })
+    );
     ```
   - [ ] Add CORS configuration:
     ```typescript
     import { cors } from 'hono/cors';
-    app.use('*', cors({
-      origin: ['http://localhost:3000'],
-      credentials: true,
-    }));
+    app.use(
+      '*',
+      cors({
+        origin: ['http://localhost:3000'],
+        credentials: true,
+      })
+    );
     ```
 
 - [ ] **Step 5.7**: Performance improvements (from analysis)
   - [ ] Add database indexes to `prisma/schema.prisma`:
+
     ```prisma
     model Todo {
       // ... existing fields ...
@@ -1985,6 +2070,7 @@ Before starting the migration, ensure:
       @@index([userId])
     }
     ```
+
   - [ ] Run migration: `bunx prisma migrate dev --name add_performance_indexes`
   - [ ] Add pagination support to list endpoints (optional):
     ```typescript

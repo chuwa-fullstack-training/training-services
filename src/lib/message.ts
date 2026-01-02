@@ -1,21 +1,19 @@
-import { t } from 'elysia';
-import { MessageResponse } from '../types';
+import { z } from 'zod';
+import type { MessageResponse } from '../types';
 
-export const messageSchema = t.Object({
-  message: t.String(),
-  status: t.Union([
-    t.Literal('success'),
-    t.Literal('info'),
-    t.Literal('warning'),
-  ]),
-  data: t.Optional(t.Any())
+// Zod schemas (replace TypeBox)
+export const messageSchema = z.object({
+  message: z.string(),
+  status: z.enum(['success', 'info', 'warning', 'error']),
+  data: z.any().optional(),
 });
 
-export const errorSchema = t.Object({
-  message: t.String(),
-  data: t.Optional(t.Any())
+export const errorSchema = z.object({
+  message: z.string(),
+  data: z.any().optional(),
 });
 
+// Helper function (unchanged logic)
 export const message = (
   message: string,
   options?: { status?: MessageResponse['status']; data?: unknown }
@@ -23,6 +21,6 @@ export const message = (
   return {
     message,
     status: options?.status ?? 'success',
-    ...((options?.data && { data: options.data }) || {})
+    ...((options?.data && { data: options.data }) || {}),
   };
 };
