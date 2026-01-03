@@ -5,7 +5,7 @@ import { prisma } from '../lib';
 const CategorySchema = z.object({
   id: z.number(),
   name: z.string(),
-  todos: z.array(z.object({ id: z.string() })),
+  todos: z.array(z.object({ id: z.string() })).optional(),
 });
 
 const CategoryArraySchema = z.array(CategorySchema);
@@ -18,6 +18,14 @@ const listCategoriesRoute = createRoute({
   path: '/',
   tags: ['Category'],
   summary: 'Get all categories',
+  request: {
+    query: z.object({
+      includeTodos: z
+        .enum(['true', 'false'])
+        .transform((value) => value === 'true')
+        .optional(),
+    }),
+  },
   responses: {
     200: {
       description: 'List of categories',
@@ -31,8 +39,11 @@ const listCategoriesRoute = createRoute({
 });
 
 categoryRouter.openapi(listCategoriesRoute, async (c) => {
+  const { includeTodos } = c.req.valid('query');
+  const withTodos = includeTodos ?? false;
+
   const categories = await prisma.category.findMany({
-    select: { id: true, name: true, todos: true },
+    select: withTodos ? { id: true, name: true, todos: true } : { id: true, name: true },
   });
   return c.json(categories, 200);
 });
@@ -46,6 +57,12 @@ const getCategoryRoute = createRoute({
   request: {
     params: z.object({
       id: z.string().transform(Number),
+    }),
+    query: z.object({
+      includeTodos: z
+        .enum(['true', 'false'])
+        .transform((value) => value === 'true')
+        .optional(),
     }),
   },
   responses: {
@@ -62,9 +79,12 @@ const getCategoryRoute = createRoute({
 
 categoryRouter.openapi(getCategoryRoute, async (c) => {
   const { id } = c.req.valid('param');
+  const { includeTodos } = c.req.valid('query');
+  const withTodos = includeTodos ?? false;
+
   const category = await prisma.category.findUnique({
     where: { id },
-    select: { id: true, name: true, todos: true },
+    select: withTodos ? { id: true, name: true, todos: true } : { id: true, name: true },
   });
   return c.json(category, 200);
 });
