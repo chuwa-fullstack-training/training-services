@@ -1,11 +1,16 @@
 import dayjs from 'dayjs';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '../../prisma/generated/client';
+import { withAccelerate } from '@prisma/extension-accelerate';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { AppError, InvalidUserDataError, UserAlreadyExistsError } from './errors';
 
 export const formatDate = (date: Date | string = new Date(), format = 'MM/DD/YYYY HH:mm:ss') =>
   dayjs(date).format(format);
 
-export const prisma = new PrismaClient().$extends({
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+export const prisma = new PrismaClient({ adapter }).$extends(withAccelerate()).$extends({
   model: {
     user: {
       async signUp(email: string, password: string) {
