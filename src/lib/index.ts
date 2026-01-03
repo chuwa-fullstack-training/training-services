@@ -2,7 +2,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { withAccelerate } from '@prisma/extension-accelerate';
 import dayjs from 'dayjs';
 import { Pool } from 'pg';
-import { Prisma, PrismaClient } from '../../prisma/generated/client';
+import { Prisma, PrismaClient } from '../generated/client';
 import { AppError, InvalidUserDataError, UserAlreadyExistsError } from './errors';
 
 export const formatDate = (date: Date | string = new Date(), format = 'MM/DD/YYYY HH:mm:ss') =>
