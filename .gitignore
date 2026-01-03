@@ -46,4 +46,4 @@ package-lock.json
 
 # Prisma
 /prisma/dev.db
-generated/prisma/
+prisma/generated/
