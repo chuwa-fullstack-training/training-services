@@ -1,11 +1,11 @@
+import { swaggerUI } from '@hono/swagger-ui';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
-import { swaggerUI } from '@hono/swagger-ui';
-import { categoryRouter } from './routers/category';
-import { userRouter } from './routers/user';
-import { todoRouter } from './routers/todo';
-import { loggerMiddleware, logger, logMetrics } from './lib/logger';
+import { logger, loggerMiddleware } from './lib/logger';
 import { authRateLimiter, publicRateLimiter } from './lib/rate-limit';
+import { categoryRouter } from './routers/category';
+import { todoRouter } from './routers/todo';
+import { userRouter } from './routers/user';
 
 const app = new OpenAPIHono();
 
@@ -58,7 +58,7 @@ app.get('/', (c) => {
   });
 });
 
-const port = 3001;
+const port = Bun.env.PORT || 3001;
 const env = Bun.env.NODE_ENV || 'development';
 
 logger.info(
