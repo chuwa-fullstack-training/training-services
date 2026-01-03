@@ -9,6 +9,7 @@
     "db:init": "bunx --bun prisma migrate dev --name init",
     "db:reset": "bunx --bun prisma migrate reset",
     "db:seed": "bunx --bun prisma db seed",
+    "db:generate": "bunx --bun prisma generate",
     "check-types": "bunx --bun tsc --noEmit",
     "format": "prettier --write ."
   },
