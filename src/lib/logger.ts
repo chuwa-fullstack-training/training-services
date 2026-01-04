@@ -29,7 +29,7 @@ export const logger = pino({
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
           singleLine: false,
-          messageFormat: '{levelLabel} - {msg}',
+          // messageFormat: '{level} - {msg}',
         },
       }
     : undefined,
@@ -48,11 +48,11 @@ export const logger = pino({
   },
 
   // Base configuration
-  formatters: {
-    level: (label) => {
-      return { level: label };
-    },
-  },
+  // formatters: {
+  //   level: (label) => {
+  //     return { level: label };
+  //   },
+  // },
 
   // Add timestamp
   timestamp: pino.stdTimeFunctions.isoTime,
@@ -60,7 +60,7 @@ export const logger = pino({
   // Base fields
   base: {
     env: Bun.env.NODE_ENV || 'development',
-    app: 'todo-api',
+    app: 'todo-list-service',
   },
 });
 
@@ -80,6 +80,8 @@ export const loggerMiddleware = pinoLogger({
   http: {
     // Include request ID for correlation
     reqId: () => crypto.randomUUID(),
+
+    onResMessage: false,
   },
 });
 

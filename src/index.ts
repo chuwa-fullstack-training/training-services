@@ -58,6 +58,7 @@ app.get('/', (c) => {
   });
 });
 
+const hostname = Bun.env.HOST_NAME || '0.0.0.0';
 const port = Bun.env.PORT || 3001;
 const env = Bun.env.NODE_ENV || 'development';
 
@@ -75,13 +76,14 @@ logger.info(
   'Todo List API starting up'
 );
 
-console.log(`🔥 Hono server running at http://localhost:${port}`);
-console.log(`📚 API Documentation: http://localhost:${port}/doc`);
+console.log(`🔥 Hono server running at http://${hostname}:${port}`);
+console.log(`📚 API Documentation: http://${hostname}:${port}/doc`);
 console.log(`🌍 Environment: ${env}`);
-console.log(`🛡️  Rate limiting: Enabled`);
+console.log(`🛡️ Rate limiting: Enabled`);
 console.log(`📊 Structured logging: Enabled`);
 
 export default {
+  hostname,
   port,
   fetch: app.fetch,
 };
