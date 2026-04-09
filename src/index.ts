@@ -61,6 +61,13 @@ app.doc('/doc/openapi.json', {
   ],
 });
 
+// Serve frontend app
+app.get('/app', async (c) => {
+  const file = Bun.file(import.meta.dir + '/static/index.html');
+  const html = await file.text();
+  return c.html(html);
+});
+
 // Health check
 app.get('/', (c) => {
   logger.debug('Health check endpoint accessed');

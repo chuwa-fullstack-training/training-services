@@ -1,0 +1,1414 @@
+<!doctype html>
+<html lang="en" class="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TodoApp</title>
+
+    <!-- Apply dark before paint -->
+    <script>
+      if (localStorage.getItem('darkMode') === 'true')
+        document.documentElement.classList.add('dark');
+    </script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* ─── Design Tokens ─── */
+      :root {
+        --bg: #f5f0e7;
+        --bg-card: #ffffff;
+        --bg-input: #fdfaf5;
+        --bg-nav: rgba(245, 240, 231, 0.92);
+        --border: #e0d8c8;
+        --border-focus: #e85d04;
+        --text: #1a1612;
+        --text-muted: #8a7e70;
+        --text-light: #b5a998;
+        --accent: #e85d04;
+        --accent-dim: #f5934a;
+        --success: #52b788;
+        --danger: #d62828;
+        --cat-bg: #fff3eb;
+        --cat-text: #c04a00;
+        --shadow-sm: 0 1px 3px rgba(26, 22, 18, 0.06), 0 1px 2px rgba(26, 22, 18, 0.04);
+        --shadow-md: 0 4px 16px rgba(26, 22, 18, 0.08), 0 2px 6px rgba(26, 22, 18, 0.05);
+        --shadow-lg: 0 12px 40px rgba(26, 22, 18, 0.12);
+        --radius: 14px;
+        --radius-sm: 8px;
+        --radius-pill: 999px;
+      }
+      html.dark {
+        --bg: #171410;
+        --bg-card: #221e19;
+        --bg-input: #2b2520;
+        --bg-nav: rgba(23, 20, 16, 0.92);
+        --border: #332e27;
+        --text: #f5f0e7;
+        --text-muted: #8a7e70;
+        --text-light: #5a5248;
+        --cat-bg: #3d2210;
+        --cat-text: #f7934a;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+        --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+      }
+
+      /* ─── Reset & Base ─── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        font-size: 16px;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'DM Sans', system-ui, sans-serif;
+        font-weight: 400;
+        line-height: 1.6;
+        transition:
+          background 0.25s,
+          color 0.25s;
+      }
+      .hidden {
+        display: none !important;
+      }
+      button {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      input {
+        font-family: inherit;
+      }
+
+      /* ─── Typography ─── */
+      .font-display {
+        font-family: 'Playfair Display', Georgia, serif;
+      }
+
+      /* ─── Nav ─── */
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg-nav);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 1.5rem;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition:
+          background 0.25s,
+          border-color 0.25s;
+      }
+      .nav-logo {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--accent);
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .nav-logo span {
+        font-size: 1.1rem;
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .nav-email {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        max-width: 160px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ─── Buttons ─── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        padding: 10px 20px;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-dim);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+      }
+      .btn-primary:active:not(:disabled) {
+        transform: translateY(0);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        padding: 7px 9px;
+        border-radius: var(--radius-sm);
+        font-size: 1rem;
+      }
+      .btn-ghost:hover {
+        background: var(--border);
+        color: var(--text);
+      }
+      .btn-danger {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid transparent;
+        padding: 4px 10px;
+        font-size: 0.8rem;
+        border-radius: var(--radius-pill);
+      }
+      .btn-danger:hover {
+        border-color: var(--danger);
+        background: rgba(214, 40, 40, 0.06);
+      }
+
+      /* ─── Input ─── */
+      .input {
+        width: 100%;
+        background: var(--bg-input);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-size: 0.9rem;
+        padding: 11px 14px;
+        outline: none;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .input::placeholder {
+        color: var(--text-light);
+      }
+      .input:focus {
+        border-color: var(--border-focus);
+        box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.12);
+      }
+
+      /* ─── Cards ─── */
+      .card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        transition:
+          background 0.25s,
+          border-color 0.25s;
+      }
+      .card-elevated {
+        box-shadow: var(--shadow-md);
+      }
+
+      /* ─── LOGIN VIEW ─── */
+      #login-view {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .login-header {
+        padding: 1.25rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .login-body {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1rem;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 2.5rem;
+      }
+      .login-eyebrow {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.75rem;
+      }
+      .login-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        font-weight: 900;
+        line-height: 1.15;
+        color: var(--text);
+        margin-bottom: 0.5rem;
+      }
+      .login-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+      }
+      .form-group {
+        margin-bottom: 1rem;
+      }
+      .form-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        letter-spacing: 0.02em;
+      }
+      .form-error {
+        font-size: 0.8rem;
+        color: var(--danger);
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .btn-login {
+        width: 100%;
+        margin-top: 1.25rem;
+        padding: 13px;
+        font-size: 0.9rem;
+        border-radius: var(--radius-sm);
+      }
+
+      /* ─── APP VIEW ─── */
+      #app-view {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+      }
+      .app-main {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        max-width: 680px;
+        margin: 0 auto;
+        width: 100%;
+        padding: 2rem 1.25rem 1rem;
+        overflow: hidden;
+      }
+
+      /* ─── Section header ─── */
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+      }
+      .section-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.6rem;
+        font-weight: 900;
+        color: var(--text);
+      }
+
+      /* ─── Category Pills ─── */
+      .pills-wrap {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+      }
+      .pills-wrap::-webkit-scrollbar {
+        display: none;
+      }
+      .pill {
+        flex-shrink: 0;
+        padding: 6px 14px;
+        border-radius: var(--radius-pill);
+        font-size: 0.8rem;
+        font-weight: 500;
+        border: 1.5px solid var(--border);
+        color: var(--text-muted);
+        background: transparent;
+        transition: all 0.15s;
+        white-space: nowrap;
+      }
+      .pill:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .pill.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      /* ─── Create Form ─── */
+      .create-wrap {
+        background: var(--bg-card);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        padding: 12px 12px 10px 16px;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+      }
+      .create-wrap:focus-within {
+        border-color: var(--border-focus);
+        box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.1);
+      }
+      #create-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .create-input {
+        width: 100%;
+        background: transparent;
+        border: none;
+        outline: none;
+        font-size: 0.9rem;
+        color: var(--text);
+        padding: 2px 0 8px;
+      }
+      .create-input::placeholder {
+        color: var(--text-light);
+      }
+      .create-row2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+      }
+      .create-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 18px;
+        margin-top: 4px;
+      }
+      .char-count {
+        font-size: 0.75rem;
+        color: var(--text-light);
+        margin-left: auto;
+      }
+      .char-count.warn {
+        color: var(--danger);
+      }
+      .inline-error {
+        font-size: 0.8rem;
+        color: var(--danger);
+      }
+
+      /* ─── Category Picker ─── */
+      .cat-picker {
+        position: relative;
+      }
+      .cat-trigger {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        padding: 5px 10px;
+        border-radius: var(--radius-pill);
+        border: 1.5px solid var(--border);
+        background: var(--cat-bg);
+        color: var(--cat-text);
+        cursor: pointer;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
+        white-space: nowrap;
+      }
+      .cat-trigger:hover {
+        border-color: var(--accent-dim);
+      }
+      .cat-trigger.open {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(232, 93, 4, 0.12);
+      }
+      .cat-chevron {
+        font-size: 0.65rem;
+        color: var(--cat-text);
+        opacity: 0.7;
+        transition: transform 0.18s;
+      }
+      .cat-trigger.open .cat-chevron {
+        transform: rotate(180deg);
+      }
+      .cat-dropdown {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        min-width: 170px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        box-shadow: var(--shadow-lg);
+        z-index: 100;
+        overflow: hidden;
+        animation: dropIn 0.14s ease;
+      }
+      .cat-dropdown.hidden {
+        display: none;
+      }
+      @keyframes dropIn {
+        from {
+          opacity: 0;
+          transform: translateY(-6px) scale(0.97);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      .cat-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 14px;
+        font-size: 0.84rem;
+        cursor: pointer;
+        color: var(--text);
+        border: none;
+        background: transparent;
+        width: 100%;
+        text-align: left;
+        transition: background 0.1s;
+      }
+      .cat-option:hover {
+        background: var(--bg-input);
+      }
+      .cat-option.selected {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .opt-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.1s;
+      }
+      .cat-option.selected .opt-dot {
+        opacity: 1;
+      }
+
+      /* ─── Todo Items ─── */
+      #todo-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-right: 2px; /* prevent scrollbar from clipping card shadows */
+      }
+
+      .todo-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+        transition:
+          box-shadow 0.15s,
+          border-color 0.15s,
+          transform 0.15s,
+          opacity 0.2s;
+        animation: slideIn 0.25s ease both;
+      }
+      .todo-item:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-1px);
+      }
+      .todo-item:hover .todo-delete {
+        opacity: 1;
+      }
+      .todo-item.completed {
+        opacity: 0.65;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Stagger children */
+      .todo-item:nth-child(1) {
+        animation-delay: 0.04s;
+      }
+      .todo-item:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+      .todo-item:nth-child(3) {
+        animation-delay: 0.12s;
+      }
+      .todo-item:nth-child(4) {
+        animation-delay: 0.16s;
+      }
+      .todo-item:nth-child(5) {
+        animation-delay: 0.2s;
+      }
+      .todo-item:nth-child(6) {
+        animation-delay: 0.24s;
+      }
+      .todo-item:nth-child(7) {
+        animation-delay: 0.28s;
+      }
+      .todo-item:nth-child(8) {
+        animation-delay: 0.32s;
+      }
+      .todo-item:nth-child(9) {
+        animation-delay: 0.36s;
+      }
+      .todo-item:nth-child(10) {
+        animation-delay: 0.4s;
+      }
+
+      /* Custom checkbox */
+      .todo-check {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          border-color 0.15s,
+          background 0.2s;
+        position: relative;
+        overflow: hidden;
+      }
+      .todo-check::after {
+        content: '✓';
+        font-size: 0.7rem;
+        color: white;
+        opacity: 0;
+        transform: scale(0.5);
+        transition: all 0.15s;
+      }
+      .todo-check:hover {
+        border-color: var(--accent);
+      }
+      .todo-check.checked {
+        background: var(--success);
+        border-color: var(--success);
+      }
+      .todo-check.checked::after {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .todo-title {
+        flex: 1;
+        font-size: 0.9rem;
+        color: var(--text);
+        transition: color 0.2s;
+      }
+      .todo-title.completed {
+        text-decoration: line-through;
+        color: var(--text-muted);
+      }
+
+      .todo-cat {
+        font-size: 0.72rem;
+        font-weight: 500;
+        padding: 3px 9px;
+        border-radius: var(--radius-pill);
+        background: var(--cat-bg);
+        color: var(--cat-text);
+        flex-shrink: 0;
+      }
+
+      .todo-delete {
+        flex-shrink: 0;
+        background: transparent;
+        border: none;
+        color: var(--text-light);
+        font-size: 1rem;
+        line-height: 1;
+        padding: 4px 6px;
+        border-radius: var(--radius-sm);
+        opacity: 0;
+        transition:
+          opacity 0.15s,
+          color 0.15s,
+          background 0.15s;
+      }
+      .todo-delete:hover {
+        color: var(--danger);
+        background: rgba(214, 40, 40, 0.08);
+      }
+
+      /* ─── Skeleton ─── */
+      .skeleton-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px 16px;
+      }
+      .skel {
+        background: var(--border);
+        border-radius: 4px;
+        animation: shimmer 1.5s ease infinite;
+      }
+      @keyframes shimmer {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      .skel-circle {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .skel-line {
+        height: 13px;
+        flex: 1;
+      }
+      .skel-badge {
+        width: 60px;
+        height: 20px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+
+      /* ─── Empty State ─── */
+      .empty-state {
+        text-align: center;
+        padding: 3.5rem 1rem;
+        color: var(--text-muted);
+      }
+      .empty-icon {
+        font-size: 2.5rem;
+        margin-bottom: 0.75rem;
+      }
+      .empty-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 0.4rem;
+      }
+      .empty-sub {
+        font-size: 0.875rem;
+      }
+
+      /* ─── Pagination ─── */
+      #pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding-top: 1.5rem;
+      }
+      .page-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-sm);
+        border: 1.5px solid var(--border);
+        background: var(--bg-card);
+        color: var(--text);
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+      .page-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .page-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+      #page-info {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        min-width: 80px;
+        text-align: center;
+      }
+
+      /* ─── Toast ─── */
+      #toast-container {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 200;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+      .toast {
+        padding: 11px 16px;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 500;
+        box-shadow: var(--shadow-lg);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        animation: toastIn 0.2s ease;
+        pointer-events: auto;
+      }
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateX(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      .toast-error {
+        background: var(--danger);
+        color: #fff;
+      }
+      .toast-success {
+        background: var(--success);
+        color: #fff;
+      }
+
+      /* ─── Divider ─── */
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 1.75rem 0;
+      }
+
+      /* ─── Logout badge ─── */
+      .logout-btn {
+        font-size: 0.8rem;
+        font-weight: 500;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        border: 1.5px solid var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        transition: all 0.15s;
+      }
+      .logout-btn:hover {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      /* ─── Responsive ─── */
+      @media (max-width: 480px) {
+        .nav-email {
+          display: none;
+        }
+        .login-card {
+          padding: 2rem 1.5rem;
+        }
+        .app-main {
+          padding: 1.5rem 1rem 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════ LOGIN VIEW ═══════════════════ -->
+    <div id="login-view" class="hidden">
+      <div class="login-header">
+        <div class="nav-logo font-display"><span>✦</span> TodoApp</div>
+        <button id="login-dark-toggle" class="btn-ghost btn" title="Toggle theme">🌙</button>
+      </div>
+      <div class="login-body">
+        <div class="card card-elevated login-card">
+          <p class="login-eyebrow">Your workspace</p>
+          <h1 class="login-title">Good to see<br />you again.</h1>
+          <p class="login-subtitle">Sign in to pick up where you left off.</p>
+
+          <form id="login-form">
+            <div class="form-group">
+              <label class="form-label" for="login-email">Email address</label>
+              <input
+                id="login-email"
+                class="input"
+                type="email"
+                required
+                placeholder="you@example.com"
+                autocomplete="email"
+              />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="login-password">Password</label>
+              <input
+                id="login-password"
+                class="input"
+                type="password"
+                required
+                placeholder="••••••••"
+                autocomplete="current-password"
+              />
+            </div>
+            <p id="login-error" class="form-error hidden">⚠ <span id="login-error-msg"></span></p>
+            <button type="submit" id="login-btn" class="btn btn-primary btn-login">Sign in</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ APP VIEW ═══════════════════ -->
+    <div id="app-view" class="hidden">
+      <nav class="nav">
+        <div class="nav-logo font-display"><span>✦</span> TodoApp</div>
+        <div class="nav-actions">
+          <button id="app-dark-toggle" class="btn-ghost btn" title="Toggle theme">🌙</button>
+          <span id="user-email" class="nav-email"></span>
+          <button id="logout-btn" class="logout-btn">Logout</button>
+        </div>
+      </nav>
+
+      <main class="app-main">
+        <!-- Page title -->
+        <div class="section-header" style="margin-bottom: 1.5rem">
+          <h2 class="section-title">My Todos</h2>
+        </div>
+
+        <!-- Category pills -->
+        <div id="category-pills" class="pills-wrap" style="margin-bottom: 1.25rem"></div>
+
+        <!-- Create form -->
+        <div class="create-wrap">
+          <form id="create-form">
+            <input
+              id="new-todo-input"
+              class="create-input"
+              type="text"
+              maxlength="200"
+              placeholder="What needs to be done?"
+              autocomplete="off"
+            />
+            <div class="create-row2">
+              <div class="cat-picker" id="cat-picker">
+                <button
+                  type="button"
+                  class="cat-trigger"
+                  id="cat-trigger"
+                  onclick="toggleCatPicker(event)"
+                >
+                  <span id="cat-trigger-label">Category</span>
+                  <span class="cat-chevron">▾</span>
+                </button>
+                <div class="cat-dropdown hidden" id="cat-dropdown"></div>
+              </div>
+              <div style="flex: 1"></div>
+              <button
+                type="submit"
+                id="create-btn"
+                class="btn btn-primary"
+                style="padding: 8px 18px"
+              >
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+        <div class="create-meta">
+          <p id="create-error" class="inline-error hidden"></p>
+          <span id="char-counter" class="char-count"></span>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Todo list -->
+        <div id="todo-list"></div>
+
+        <!-- Pagination -->
+        <div id="pagination" class="hidden">
+          <button id="prev-btn" class="page-btn" title="Previous page">←</button>
+          <span id="page-info"></span>
+          <button id="next-btn" class="page-btn" title="Next page">→</button>
+        </div>
+      </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <script>
+      // ═══════════════════════════════════════════════
+      // SECTION 1: STATE
+      // ═══════════════════════════════════════════════
+      const state = {
+        token: localStorage.getItem('token'),
+        email: localStorage.getItem('email'),
+        todos: [],
+        categories: [],
+        page: 1,
+        limit: 7,
+        totalPages: 1,
+        categoryId: null, // filter
+        createCategoryId: null, // picker for new todos
+        darkMode: localStorage.getItem('darkMode') === 'true',
+      };
+
+      // ═══════════════════════════════════════════════
+      // SECTION 2: DARK MODE
+      // ═══════════════════════════════════════════════
+      function applyDarkMode() {
+        document.documentElement.classList.toggle('dark', state.darkMode);
+        const icon = state.darkMode ? '☀️' : '🌙';
+        document.getElementById('login-dark-toggle').textContent = icon;
+        document.getElementById('app-dark-toggle').textContent = icon;
+      }
+      function toggleDarkMode() {
+        state.darkMode = !state.darkMode;
+        localStorage.setItem('darkMode', state.darkMode);
+        applyDarkMode();
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 3: TOAST
+      // ═══════════════════════════════════════════════
+      function showToast(message, type = 'error') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = type === 'error' ? `⚠ ${message}` : `✓ ${message}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3200);
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 4: API HELPER
+      // ═══════════════════════════════════════════════
+      async function apiCall(method, path, body) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+
+        let res;
+        try {
+          res = await fetch(`/api${path}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined,
+          });
+        } catch {
+          showToast('No connection — check your network');
+          throw new Error('network_error');
+        }
+
+        if (res.status === 401) {
+          logout();
+          showToast('Session expired — please sign in again');
+          throw new Error('unauthorized');
+        }
+        if (res.status === 403) {
+          showToast("You don't have permission to do that");
+          throw new Error('forbidden');
+        }
+        if (res.status === 404) {
+          showToast('That item no longer exists');
+          throw new Error('not_found');
+        }
+        if (res.status === 429) {
+          showToast('Too many requests — slow down a bit');
+          throw new Error('rate_limited');
+        }
+        if (res.status >= 500) {
+          showToast('Server error — please try again');
+          throw new Error('server_error');
+        }
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'request_failed');
+        }
+        return res.json();
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 5: VIEW SWITCHING + LOGOUT
+      // ═══════════════════════════════════════════════
+      function showView(id) {
+        document.getElementById('login-view').classList.toggle('hidden', id !== 'login-view');
+        document.getElementById('app-view').classList.toggle('hidden', id !== 'app-view');
+      }
+      function logout() {
+        state.token = null;
+        state.email = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('email');
+        showView('login-view');
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 6: INIT
+      // ═══════════════════════════════════════════════
+      applyDarkMode();
+      showView(state.token ? 'app-view' : 'login-view');
+      document.getElementById('login-dark-toggle').addEventListener('click', toggleDarkMode);
+      document.getElementById('app-dark-toggle').addEventListener('click', toggleDarkMode);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+
+      // ═══════════════════════════════════════════════
+      // SECTION 7: LOGIN
+      // ═══════════════════════════════════════════════
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+        const errorMsg = document.getElementById('login-error-msg');
+        const btn = document.getElementById('login-btn');
+
+        errorEl.classList.add('hidden');
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+
+        try {
+          const data = await apiCall('POST', '/auth/login', { email, password });
+          state.token = data.data.token;
+          state.email = data.data.email;
+          localStorage.setItem('token', state.token);
+          localStorage.setItem('email', state.email);
+          document.getElementById('user-email').textContent = state.email;
+          showView('app-view');
+          await loadApp();
+        } catch (err) {
+          errorMsg.textContent =
+            err.message === 'network_error'
+              ? 'Network error, please try again'
+              : 'Invalid email or password';
+          errorEl.classList.remove('hidden');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Sign in';
+        }
+      });
+
+      // ═══════════════════════════════════════════════
+      // SECTION 8: CATEGORIES
+      // ═══════════════════════════════════════════════
+      async function loadCategories() {
+        const categories = await apiCall('GET', '/categories');
+        state.categories = categories;
+        // Default the picker to the first category on initial load
+        if (categories.length > 0 && state.createCategoryId === null) {
+          state.createCategoryId = categories[0].id;
+        }
+        renderCategoryPills();
+        renderCategoryPicker();
+      }
+
+      function renderCategoryPills() {
+        const container = document.getElementById('category-pills');
+        const pills = [{ id: null, name: 'All' }, ...state.categories];
+        container.innerHTML = pills
+          .map((cat) => {
+            const isActive = state.categoryId === cat.id;
+            return `<button
+      class="pill${isActive ? ' active' : ''}"
+      onclick="selectCategory(${cat.id === null ? 'null' : cat.id})"
+    >${escapeHtml(cat.name)}</button>`;
+          })
+          .join('');
+      }
+
+      function selectCategory(id) {
+        state.categoryId = id;
+        state.page = 1;
+        renderCategoryPills();
+        loadTodos();
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 9: TODO LIST + PAGINATION + BOOTSTRAP
+      // ═══════════════════════════════════════════════
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      async function loadTodos() {
+        renderTodosLoading();
+        const params = new URLSearchParams({ page: state.page, limit: state.limit });
+        if (state.categoryId) params.set('categoryId', state.categoryId);
+
+        try {
+          const data = await apiCall('GET', `/todos?${params}`);
+          state.todos = data.data;
+          state.totalPages = data.pagination.totalPages;
+          renderTodos();
+          renderPagination();
+        } catch {
+          document.getElementById('todo-list').innerHTML =
+            '<div class="empty-state"><div class="empty-icon">😶‍🌫️</div><p class="empty-title">Couldn\'t load todos</p><p class="empty-sub">Check your connection and try again.</p></div>';
+        }
+      }
+
+      function getCategoryName(categoryId) {
+        const cat = state.categories.find((c) => c.id === categoryId);
+        return cat ? cat.name : '—';
+      }
+
+      function renderTodos() {
+        const list = document.getElementById('todo-list');
+        if (state.todos.length === 0) {
+          const [icon, title, sub] = state.categoryId
+            ? ['🔍', 'Nothing here', 'No todos in this category yet.']
+            : ['✦', 'All clear!', 'Add a todo above to get started.'];
+          list.innerHTML = `<div class="empty-state"><div class="empty-icon">${icon}</div><p class="empty-title">${title}</p><p class="empty-sub">${sub}</p></div>`;
+          return;
+        }
+
+        list.innerHTML = state.todos
+          .map((todo, i) => {
+            const catName = getCategoryName(todo.categoryId);
+            const checked = todo.completed;
+            return `
+    <div class="todo-item${checked ? ' completed' : ''}" style="animation-delay:${i * 0.04}s">
+      <button class="todo-check${checked ? ' checked' : ''}"
+        onclick="toggleTodo('${todo.id}', ${checked})"
+        title="${checked ? 'Mark incomplete' : 'Mark complete'}"></button>
+      <span class="todo-title${checked ? ' completed' : ''}">${escapeHtml(todo.title)}</span>
+      <span class="todo-cat">${escapeHtml(catName)}</span>
+      <button class="todo-delete" onclick="deleteTodo('${todo.id}')" title="Delete">✕</button>
+    </div>`;
+          })
+          .join('');
+      }
+
+      function renderTodosLoading() {
+        document.getElementById('todo-list').innerHTML = Array(5)
+          .fill(0)
+          .map(
+            (_, i) =>
+              `<div class="skeleton-item" style="opacity:${1 - i * 0.1}">
+      <div class="skel skel-circle"></div>
+      <div class="skel skel-line" style="width:${55 + Math.random() * 35}%"></div>
+      <div class="skel skel-badge"></div>
+    </div>`
+          )
+          .join('');
+      }
+
+      function renderPagination() {
+        const el = document.getElementById('pagination');
+        if (state.totalPages <= 1) {
+          el.classList.add('hidden');
+          return;
+        }
+        el.classList.remove('hidden');
+        document.getElementById('page-info').textContent = `${state.page} of ${state.totalPages}`;
+        document.getElementById('prev-btn').disabled = state.page <= 1;
+        document.getElementById('next-btn').disabled = state.page >= state.totalPages;
+      }
+
+      document.getElementById('prev-btn').addEventListener('click', () => {
+        if (state.page > 1) {
+          state.page--;
+          loadTodos();
+        }
+      });
+      document.getElementById('next-btn').addEventListener('click', () => {
+        if (state.page < state.totalPages) {
+          state.page++;
+          loadTodos();
+        }
+      });
+
+      async function loadApp() {
+        if (state.email) document.getElementById('user-email').textContent = state.email;
+        await loadCategories();
+        await loadTodos();
+      }
+
+      if (state.token) loadApp();
+
+      // ═══════════════════════════════════════════════
+      // SECTION 10: TODO MUTATIONS
+      // ═══════════════════════════════════════════════
+      document.getElementById('create-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('new-todo-input');
+        const errorEl = document.getElementById('create-error');
+        const btn = document.getElementById('create-btn');
+        const title = input.value.trim();
+
+        errorEl.classList.add('hidden');
+
+        if (!title) {
+          errorEl.textContent = "Title can't be empty";
+          errorEl.classList.remove('hidden');
+          return;
+        }
+        if (title.length > 200) {
+          errorEl.textContent = 'Title must be 200 characters or less';
+          errorEl.classList.remove('hidden');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+          const body = { title };
+          if (state.createCategoryId) body.categoryId = state.createCategoryId;
+          await apiCall('POST', '/todos', body);
+          input.value = '';
+          document.getElementById('char-counter').textContent = '';
+          state.page = 1;
+          await loadTodos();
+          showToast('Todo added', 'success');
+        } catch {
+          // apiCall showed toast; input stays populated to preserve user text
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Add';
+        }
+      });
+
+      document.getElementById('new-todo-input').addEventListener('input', (e) => {
+        const len = e.target.value.length;
+        const counter = document.getElementById('char-counter');
+        counter.textContent = len > 180 ? `${len}/200` : '';
+        counter.classList.toggle('warn', len > 200);
+      });
+
+      async function toggleTodo(id, currentCompleted) {
+        const todo = state.todos.find((t) => t.id === id);
+        if (!todo) return;
+        todo.completed = !currentCompleted;
+        renderTodos();
+        try {
+          await apiCall('PUT', `/todos/${id}`, { completed: !currentCompleted });
+        } catch {
+          todo.completed = currentCompleted;
+          renderTodos();
+        }
+      }
+
+      async function deleteTodo(id) {
+        try {
+          await apiCall('DELETE', `/todos/${id}`);
+          state.todos = state.todos.filter((t) => t.id !== id);
+          if (state.todos.length === 0 && state.page > 1) state.page--;
+          await loadTodos();
+          showToast('Todo deleted', 'success');
+        } catch {
+          // apiCall showed toast; card stays in list
+        }
+      }
+
+      // ═══════════════════════════════════════════════
+      // SECTION 11: CATEGORY PICKER (CREATE FORM)
+      // ═══════════════════════════════════════════════
+      function renderCategoryPicker() {
+        const dropdown = document.getElementById('cat-dropdown');
+        if (!dropdown) return;
+        dropdown.innerHTML = state.categories
+          .map((cat) => {
+            const isSelected = state.createCategoryId === cat.id;
+            return `<button type="button" class="cat-option${isSelected ? ' selected' : ''}"
+      onclick="selectCreateCategory(${cat.id})">
+      <span class="opt-dot"></span>
+      ${escapeHtml(cat.name)}
+    </button>`;
+          })
+          .join('');
+        updateCatTriggerLabel();
+      }
+
+      function updateCatTriggerLabel() {
+        const label = document.getElementById('cat-trigger-label');
+        if (!label) return;
+        const cat = state.categories.find((c) => c.id === state.createCategoryId);
+        label.textContent = cat ? cat.name : 'Category';
+      }
+
+      function toggleCatPicker(e) {
+        e.stopPropagation();
+        const dropdown = document.getElementById('cat-dropdown');
+        const trigger = document.getElementById('cat-trigger');
+        const isOpen = !dropdown.classList.contains('hidden');
+        if (isOpen) {
+          dropdown.classList.add('hidden');
+          trigger.classList.remove('open');
+        } else {
+          renderCategoryPicker();
+          dropdown.classList.remove('hidden');
+          trigger.classList.add('open');
+        }
+      }
+
+      function selectCreateCategory(id) {
+        state.createCategoryId = id;
+        document.getElementById('cat-dropdown').classList.add('hidden');
+        document.getElementById('cat-trigger').classList.remove('open');
+        updateCatTriggerLabel();
+      }
+
+      // Close picker on outside click
+      document.addEventListener('click', (e) => {
+        const picker = document.getElementById('cat-picker');
+        if (picker && !picker.contains(e.target)) {
+          document.getElementById('cat-dropdown')?.classList.add('hidden');
+          document.getElementById('cat-trigger')?.classList.remove('open');
+        }
+      });
+    </script>
+  </body>
+</html>
