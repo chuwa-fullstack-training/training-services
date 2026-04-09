@@ -8,6 +8,13 @@ async function createUser() {
   await prisma.user.signUp('jason@test.com', 'password');
 }
 
+async function setAdminUser() {
+  await prisma.user.update({
+    where: { email: 'test1@test.com' },
+    data: { role: 'ADMIN' },
+  });
+}
+
 async function createCategory() {
   await prisma.category.create({ data: { name: 'Default' } });
   await prisma.category.create({ data: { name: 'Study' } });
@@ -66,6 +73,7 @@ async function updateTodoUser() {
 
 async function seed() {
   await createUser();
+  await setAdminUser();
   await createCategory();
   await createTodo();
   await updateTodoUser();

@@ -1,5 +1,7 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { prisma } from '../lib';
+import { optionalAuth } from '../lib/auth';
+import { errorSchema } from '../lib/message';
 
 // Zod schemas
 const CategorySchema = z.object({
@@ -18,6 +20,7 @@ const listCategoriesRoute = createRoute({
   path: '/',
   tags: ['Category'],
   summary: 'Get all categories',
+  middleware: optionalAuth,
   request: {
     query: z.object({
       includeTodos: z
@@ -35,11 +38,24 @@ const listCategoriesRoute = createRoute({
         },
       },
     },
+    403: {
+      description: 'Forbidden - admin role required for includeTodos',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
   },
 });
 
 categoryRouter.openapi(listCategoriesRoute, async (c) => {
   const { includeTodos } = c.req.valid('query');
+
+  if (includeTodos && c.get('role' as never) !== 'ADMIN') {
+    return c.json({ message: 'Forbidden' }, 403);
+  }
+
   const withTodos = includeTodos ?? false;
 
   const categories = await prisma.category.findMany({
@@ -54,6 +70,7 @@ const getCategoryRoute = createRoute({
   path: '/{id}',
   tags: ['Category'],
   summary: 'Get category by ID',
+  middleware: optionalAuth,
   request: {
     params: z.object({
       id: z.string().transform(Number),
@@ -74,12 +91,25 @@ const getCategoryRoute = createRoute({
         },
       },
     },
+    403: {
+      description: 'Forbidden - admin role required for includeTodos',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
   },
 });
 
 categoryRouter.openapi(getCategoryRoute, async (c) => {
   const { id } = c.req.valid('param');
   const { includeTodos } = c.req.valid('query');
+
+  if (includeTodos && c.get('role' as never) !== 'ADMIN') {
+    return c.json({ message: 'Forbidden' }, 403);
+  }
+
   const withTodos = includeTodos ?? false;
 
   const category = await prisma.category.findUnique({

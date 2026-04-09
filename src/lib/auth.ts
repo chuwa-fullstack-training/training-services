@@ -7,6 +7,7 @@ const JWT_SECRET = Bun.env.JWT_SECRET!;
 // Type for authenticated context
 type AuthVariables = {
   userId: string;
+  role: string;
 };
 
 /**
@@ -36,8 +37,9 @@ export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(asy
       return c.json({ message: 'Invalid or expired token' }, 401);
     }
 
-    // Set userId in context
+    // Set userId and role in context
     c.set('userId', payload.id as string);
+    c.set('role', payload.role as string);
     await next();
   } catch (error) {
     return c.json({ message: 'Invalid or expired token' }, 401);
@@ -64,6 +66,7 @@ export const optionalAuth = createMiddleware<{ Variables: Partial<AuthVariables>
         const payload = await verify(token, JWT_SECRET, 'HS256');
         if (payload && typeof payload.id === 'string') {
           c.set('userId', payload.id as string);
+          c.set('role', payload.role as string);
         }
       } catch {
         // Silently ignore invalid tokens for optional auth
@@ -77,6 +80,6 @@ export const optionalAuth = createMiddleware<{ Variables: Partial<AuthVariables>
 /**
  * Helper to sign JWT tokens
  */
-export const signToken = async (userId: string): Promise<string> => {
-  return await sign({ id: userId }, JWT_SECRET, 'HS256');
+export const signToken = async (userId: string, role: string): Promise<string> => {
+  return await sign({ id: userId, role }, JWT_SECRET, 'HS256');
 };

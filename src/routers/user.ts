@@ -99,7 +99,7 @@ userRouter.openapi(loginRoute, async (c) => {
     return c.json({ message: 'Invalid password' }, 400);
   }
 
-  const token = await signToken(user.id);
+  const token = await signToken(user.id, user.role);
 
   // Set HttpOnly cookie
   setCookie(c, 'token', token, {
@@ -188,12 +188,12 @@ userRouter.openapi(signupRoute, async (c) => {
   }
 });
 
-// GET /api/users - List all users (requires auth)
+// GET /api/users - List all users (requires admin)
 const listUsersRoute = createRoute({
   method: 'get',
   path: '/users',
   tags: ['User'],
-  summary: 'Get all users (requires authentication)',
+  summary: 'Get all users (admin only)',
   security: [{ Bearer: [] }],
   middleware: authMiddleware,
   responses: {
@@ -214,10 +214,22 @@ const listUsersRoute = createRoute({
         },
       },
     },
+    403: {
+      description: 'Forbidden',
+      content: {
+        'application/json': {
+          schema: errorSchema,
+        },
+      },
+    },
   },
 });
 
 userRouter.openapi(listUsersRoute, async (c) => {
+  if (c.get('role') !== 'ADMIN') {
+    return c.json({ message: 'Forbidden' }, 403);
+  }
+
   const users = await prisma.user.findMany({
     select: {
       id: true,
@@ -277,12 +289,12 @@ userRouter.openapi(getMeRoute, async (c) => {
   return c.json(user, 200);
 });
 
-// GET /api/users/:id - Get user by ID (must own profile)
+// GET /api/users/:id - Get user by ID (admin only)
 const getUserRoute = createRoute({
   method: 'get',
   path: '/users/{id}',
   tags: ['User'],
-  summary: 'Get user by ID (can only access own profile)',
+  summary: 'Get user by ID (admin only)',
   security: [{ Bearer: [] }],
   middleware: authMiddleware,
   request: {
@@ -312,10 +324,8 @@ const getUserRoute = createRoute({
 
 userRouter.openapi(getUserRoute, async (c) => {
   const { id } = c.req.valid('param');
-  const userId = c.get('userId');
 
-  // Authorization check
-  if (id !== userId) {
+  if (c.get('role') !== 'ADMIN') {
     return c.json({ message: 'Access denied' }, 403);
   }
 
