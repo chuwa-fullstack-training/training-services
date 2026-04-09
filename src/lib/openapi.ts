@@ -10,9 +10,9 @@ export function createOpenAPIApp() {
   app.doc('/openapi.json', {
     openapi: '3.0.0',
     info: {
-      title: 'Todo List API - Hono',
+      title: 'Toy API - Hono',
       version: '2.0.0',
-      description: 'API for Todo List Management with Hono Framework',
+      description: 'API for Toy with Hono Framework',
     },
     tags: [
       { name: 'Auth', description: 'Authentication endpoints' },

@@ -49,9 +49,9 @@ app.get('/doc', swaggerUI({ url: '/doc/openapi.json' }));
 app.doc('/doc/openapi.json', {
   openapi: '3.0.0',
   info: {
-    title: 'Todo List API',
+    title: 'Toy API',
     version: '2.0.0',
-    description: 'Todo List Management API - Hono Framework',
+    description: 'Toy API - Hono Framework',
   },
   tags: [
     { name: 'Auth', description: 'Authentication endpoints' },
@@ -65,7 +65,7 @@ app.doc('/doc/openapi.json', {
 app.get('/', (c) => {
   logger.debug('Health check endpoint accessed');
   return c.json({
-    message: 'Todo List API - Hono',
+    message: 'Toy API - Hono',
     version: APP_VERSION,
     framework: 'Hono',
     documentation: '/doc',
@@ -93,7 +93,7 @@ logger.info(
       authentication: true,
     },
   },
-  'Todo List API starting up'
+  'Toy API starting up'
 );
 
 console.log(`🔥 Hono server running at http://${hostname}:${port}`);
