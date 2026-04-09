@@ -30,7 +30,7 @@ export const authMiddleware = createMiddleware<{ Variables: AuthVariables }>(asy
   }
 
   try {
-    const payload = await verify(token, JWT_SECRET);
+    const payload = await verify(token, JWT_SECRET, 'HS256');
 
     if (!payload || typeof payload.id !== 'string') {
       return c.json({ message: 'Invalid or expired token' }, 401);
@@ -61,7 +61,7 @@ export const optionalAuth = createMiddleware<{ Variables: Partial<AuthVariables>
 
     if (token) {
       try {
-        const payload = await verify(token, JWT_SECRET);
+        const payload = await verify(token, JWT_SECRET, 'HS256');
         if (payload && typeof payload.id === 'string') {
           c.set('userId', payload.id as string);
         }
@@ -78,5 +78,5 @@ export const optionalAuth = createMiddleware<{ Variables: Partial<AuthVariables>
  * Helper to sign JWT tokens
  */
 export const signToken = async (userId: string): Promise<string> => {
-  return await sign({ id: userId }, JWT_SECRET);
+  return await sign({ id: userId }, JWT_SECRET, 'HS256');
 };

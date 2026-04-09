@@ -10,7 +10,8 @@
       "WebFetch(domain:hono.dev)",
       "mcp__context7__resolve-library-id",
       "Bash(git commit:*)",
-      "mcp__serena__get_symbols_overview"
+      "mcp__serena__get_symbols_overview",
+      "Bash(grep -r \"registerComponent\\\\|securitySchemes\" /Users/aaronz/Study/training-services/node_modules/@hono/zod-openapi/dist --include=*.js -l)"
     ],
     "deny": [],
     "ask": []

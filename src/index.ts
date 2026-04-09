@@ -27,6 +27,13 @@ app.route('/api/categories', categoryRouter);
 app.route('/api', userRouter); // Handles /api/auth/* and /api/users/*
 app.route('/api/todos', todoRouter);
 
+// Register Bearer security scheme so Swagger UI shows the Authorize button
+app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
+  type: 'http',
+  scheme: 'bearer',
+  bearerFormat: 'JWT',
+});
+
 // Swagger UI
 app.get('/doc', swaggerUI({ url: '/doc/openapi.json' }));
 
@@ -58,7 +65,7 @@ app.get('/', (c) => {
   });
 });
 
-const hostname = Bun.env.HOST_NAME || '0.0.0.0';
+const hostname = Bun.env.HOST_NAME || '127.0.0.1';
 const port = Bun.env.PORT || 3001;
 const env = Bun.env.NODE_ENV || 'development';
 
