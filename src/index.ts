@@ -7,14 +7,22 @@ import { categoryRouter } from './routers/category';
 import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
 
+const APP_VERSION: string = Bun.env.npm_package_version ?? 'unknown';
+
 const app = new OpenAPIHono();
 
 // Global middleware - Applied in order
-// 1. Logging middleware (first to capture all requests)
+// 1. Logging middleware (must be first to capture all requests)
 app.use('*', loggerMiddleware);
 
 // 2. CORS middleware
 app.use('*', cors());
+
+// 3. Version header on all responses
+app.use('*', async (c, next) => {
+  await next();
+  c.res.headers.set('X-API-Version', APP_VERSION);
+});
 
 // 3. Rate limiting - Apply to auth endpoints (stricter limits)
 app.use('/api/auth/*', authRateLimiter);
@@ -58,11 +66,16 @@ app.get('/', (c) => {
   logger.debug('Health check endpoint accessed');
   return c.json({
     message: 'Todo List API - Hono',
-    version: '2.0.0',
+    version: APP_VERSION,
     framework: 'Hono',
     documentation: '/doc',
     environment: Bun.env.NODE_ENV || 'development',
   });
+});
+
+// Version endpoint
+app.get('/version', (c) => {
+  return c.json({ version: APP_VERSION });
 });
 
 const hostname = Bun.env.HOST_NAME || '127.0.0.1';
