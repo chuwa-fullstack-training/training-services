@@ -60,7 +60,7 @@ export const logger = pino({
   // Base fields
   base: {
     env: Bun.env.NODE_ENV || 'development',
-    app: 'todo-list-service',
+    app: 'toy-service',
   },
 });
 
