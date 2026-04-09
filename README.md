@@ -81,17 +81,18 @@ http://localhost:3001/doc
 ### Authentication
 
 - `POST /api/auth/signup` - Create new user account
-- `POST /api/auth/login` - Login and receive JWT token
+- `POST /api/auth/login` - Login and receive JWT token (role encoded in JWT)
 
 ### Users
 
-- `GET /api/users` - List all users (authenticated)
+- `GET /api/users` - List all users (**admin only**)
 - `GET /api/users/me` - Get current user profile (authenticated)
-- `GET /api/users/{id}` - Get user by ID (authenticated, own profile only)
+- `GET /api/users/{id}` - Get user by ID (**admin only**)
 
 ### Todos
 
-- `GET /api/todos` - List user's todos (authenticated)
+- `GET /api/todos` - List user's todos with pagination (authenticated)
+- `GET /api/todos?page={n}&limit={n}` - Paginated todos (default: page=1, limit=10, max limit=100)
 - `GET /api/todos?categoryId={id}` - Filter todos by category (authenticated)
 - `GET /api/todos/{id}` - Get todo by ID (authenticated)
 - `POST /api/todos` - Create new todo (authenticated)
@@ -101,7 +102,87 @@ http://localhost:3001/doc
 ### Categories
 
 - `GET /api/categories` - List all categories (public)
+- `GET /api/categories?includeTodos=true` - Include todos in response (**admin only**)
 - `GET /api/categories/{id}` - Get category by ID (public)
+- `GET /api/categories/{id}?includeTodos=true` - Include todos in response (**admin only**)
+
+## Role-Based Access Control
+
+The API supports two user roles encoded in the JWT token:
+
+| Role | Description |
+|------|-------------|
+| `USER` | Default role assigned on signup |
+| `ADMIN` | Hardcoded in the database; full API access |
+
+**Admin-only endpoints** return `403 Forbidden` for regular users:
+- `GET /api/users`
+- `GET /api/users/{id}`
+- `GET /api/categories?includeTodos=true`
+- `GET /api/categories/{id}?includeTodos=true`
+
+## Database Schema
+
+```mermaid
+---
+title: Database Schema — Entity Relationship Diagram
+---
+erDiagram
+    User {
+        String  id        PK
+        String  email     UK
+        String  password
+        Role    role
+    }
+
+    Category {
+        Int     id    PK
+        String  name
+    }
+
+    Todo {
+        String   id          PK
+        String   title
+        Boolean  completed
+        Int      categoryId  FK
+        String   userId      FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Post {
+        String   id         PK
+        String   title
+        String   content
+        Boolean  published
+        String   authorId   FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    Comment {
+        String   id        PK
+        String   content
+        String   postId    FK
+        String   authorId  FK
+        DateTime createdAt
+        DateTime updatedAt
+    }
+
+    User ||--o{ Todo    : "owns"
+    User ||--o{ Post    : "authors"
+    User ||--o{ Comment : "writes"
+    Category ||--o{ Todo    : "groups"
+    Post     ||--o{ Comment : "has"
+```
+
+| Relationship | Cardinality | On Delete |
+|---|---|---|
+| `User` → `Todo` | one-to-many (userId optional) | Cascade |
+| `User` → `Post` | one-to-many | Cascade |
+| `User` → `Comment` | one-to-many | Cascade |
+| `Category` → `Todo` | one-to-many | Cascade |
+| `Post` → `Comment` | one-to-many | Cascade |
 
 ## Rate Limiting
 
