@@ -38,14 +38,24 @@ const listTodosRoute = createRoute({
   request: {
     query: z.object({
       categoryId: z.string().transform(Number).optional(),
+      page: z.string().transform(Number).pipe(z.number().int().min(1)).optional(),
+      limit: z.string().transform(Number).pipe(z.number().int().min(1).max(100)).optional(),
     }),
   },
   responses: {
     200: {
-      description: 'List of todos',
+      description: 'Paginated list of todos',
       content: {
         'application/json': {
-          schema: z.array(TodoSchema),
+          schema: z.object({
+            data: z.array(TodoSchema),
+            pagination: z.object({
+              page: z.number(),
+              limit: z.number(),
+              total: z.number(),
+              totalPages: z.number(),
+            }),
+          }),
         },
       },
     },
@@ -56,20 +66,38 @@ todoRouter.openapi(listTodosRoute, async (c) => {
   const userId = c.get('userId');
   const query = c.req.valid('query');
 
-  const todos = await prisma.todo.findMany({
-    where: {
-      userId,
-      categoryId: query.categoryId || undefined,
-    },
-  });
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
+  const where = {
+    userId,
+    categoryId: query.categoryId || undefined,
+  };
+
+  const [todos, total] = await prisma.$transaction([
+    prisma.todo.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.todo.count({ where }),
+  ]);
 
   return c.json(
-    todos.map((todo) => ({
-      ...todo,
-      userId: todo.userId ?? '',
-      createdAt: formatDate(todo.createdAt),
-      updatedAt: formatDate(todo.updatedAt),
-    })),
+    {
+      data: todos.map((todo) => ({
+        ...todo,
+        userId: todo.userId ?? '',
+        createdAt: formatDate(todo.createdAt),
+        updatedAt: formatDate(todo.updatedAt),
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    },
     200
   );
 });
