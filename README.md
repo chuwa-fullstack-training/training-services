@@ -10,6 +10,7 @@ A production-ready Todo List API built with Hono framework, Prisma ORM, and Post
 - **Logging**: Structured logging with Pino (development and production modes)
 - **REST API**: OpenAPI/Swagger documentation via Scalar UI
 - **GraphQL API**: Schema-first GraphQL endpoint with GraphiQL playground
+- **Changelog**: `CHANGELOG.md` with auto-update on version bumps; rendered at `/release`
 - **Security**: Input validation, sensitive data redaction, secure defaults
 
 ## Tech Stack
@@ -75,6 +76,7 @@ The API will be available at `http://localhost:3001`
 - **REST (Scalar UI)**: `http://localhost:3001/doc`
 - **REST (OpenAPI spec)**: `http://localhost:3001/doc/openapi.json`
 - **GraphQL (GraphiQL playground)**: `http://localhost:3001/graphql` — pass `Authorization: Bearer <token>` in the Headers panel
+- **Changelog**: `http://localhost:3001/release` — themed markdown page (Light / Dark / Dracula / Slate)
 
 ## API Endpoints
 
@@ -269,6 +271,7 @@ See `RATE_LIMITING_AND_LOGGING_IMPLEMENTATION.md` for detailed production deploy
 
 ## Documentation
 
+- `CHANGELOG.md` - Version history and release notes (auto-updated by `version:*` scripts)
 - `MIGRATION_FINAL_REPORT.md` - PostgreSQL migration completion report
 - `RATE_LIMITING_AND_LOGGING_IMPLEMENTATION.md` - Rate limiting and logging implementation guide
 - `AUTH_IMPLEMENTATION.md` - Authentication system documentation
@@ -281,8 +284,10 @@ See `RATE_LIMITING_AND_LOGGING_IMPLEMENTATION.md` for detailed production deploy
 │   ├── schema.prisma          # Database schema
 │   ├── seed.ts                # Database seeding
 │   └── migrations/            # Migration history
+├── scripts/
+│   └── update-changelog.ts    # Auto-generates CHANGELOG.md entry from git log
 └── src/
-    ├── index.ts               # App entry — middleware, router mounts, /graphql
+    ├── index.ts               # App entry — middleware, router mounts, /graphql, /release
     ├── routers/               # REST route handlers (OpenAPI-first)
     │   ├── category.ts
     │   ├── todo.ts
@@ -303,7 +308,8 @@ See `RATE_LIMITING_AND_LOGGING_IMPLEMENTATION.md` for detailed production deploy
     │   ├── logger.ts          # Pino structured logging
     │   ├── message.ts         # Response formatting helpers
     │   ├── openapi.ts         # OpenAPI shared components
-    │   └── rate-limit.ts      # Three-tier rate limiter config
+    │   ├── rate-limit.ts      # Three-tier rate limiter config
+    │   └── release-page.ts    # HTML generator for /release (markdown + theme selector)
     ├── generated/             # Prisma-generated client (do not edit)
     ├── types/                 # Shared TypeScript types
     └── static/                # Served frontend assets

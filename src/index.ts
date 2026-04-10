@@ -91,6 +91,8 @@ app.get('/', (c) => {
     framework: 'Hono',
     documentation: '/doc',
     graphql: '/graphql',
+    changelog: '/release',
+    playground: '/app',
     environment: Bun.env.NODE_ENV || 'development',
   });
 });

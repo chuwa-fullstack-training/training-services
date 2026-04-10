@@ -23,6 +23,9 @@ bunx --bun tsc --noEmit
 
 # Code formatting
 prettier --write .
+
+# Update CHANGELOG.md manually (runs automatically via version:* scripts)
+bun run scripts/update-changelog.ts
 ```
 
 ### Database Commands
@@ -171,6 +174,20 @@ NODE_ENV=development|production      # Environment mode
 3. Call `requireAuth(ctx)` at the top of any resolver that requires authentication
 4. Register new type resolvers in the `resolvers` map in `src/graphql/index.ts`
 
+### Releasing a new version
+The `version:patch/minor/major` scripts handle the full release flow in one command:
+1. Bumps `package.json` version
+2. Runs `scripts/update-changelog.ts` — reads git commits since last tag, groups by `feat:`/`fix:`/`docs:`, prepends a new entry to `CHANGELOG.md`
+3. Stages both files and creates the version commit + git tag
+
+```bash
+bun run version:patch   # 2.3.0 → 2.3.1
+bun run version:minor   # 2.3.0 → 2.4.0
+bun run version:major   # 2.3.0 → 3.0.0
+```
+
+`update-changelog.ts` skips `chore:` and `test:` commits — only user-facing changes appear in the changelog.
+
 ### Adding Database Operations
 - Use Prisma client from `src/lib/index.ts`
 - For complex operations, consider adding custom methods via Prisma client extensions
@@ -185,12 +202,13 @@ await Bun.password.verify(password, hashedPassword)
 ```
 
 ### JWT Token Management
-- Sign tokens: `await signToken(userId)` from `src/lib/auth.ts`
+- Sign tokens: `await signToken(userId, role)` from `src/lib/auth.ts`
 - Verify tokens: Handled automatically by middleware
 - Set cookie: Use `setCookie(c, 'token', token, { httpOnly: true, ... })`
 
 ## API Documentation
-- Swagger UI available at `http://localhost:3001/doc`
+- REST (Scalar UI) at `http://localhost:3001/doc`
 - OpenAPI spec at `http://localhost:3001/doc/openapi.json`
-- All routes auto-documented via Zod schemas
+- All REST routes auto-documented via Zod schemas
 - GraphQL playground (GraphiQL) at `http://localhost:3001/graphql` — use the Headers panel to pass `Authorization: Bearer <token>`
+- Changelog / release notes at `http://localhost:3001/release` — themed markdown page, reads `CHANGELOG.md` at request time
