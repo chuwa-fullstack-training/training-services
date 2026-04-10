@@ -647,25 +647,77 @@
         transform: scale(1);
       }
 
+      .list-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 10px;
+      }
+
       .todo-title {
         flex: 1;
         font-size: 0.9rem;
         color: var(--text);
         transition: color 0.2s;
+        line-height: 1.4;
       }
       .todo-title.completed {
         text-decoration: line-through;
         color: var(--text-muted);
       }
 
+      .todo-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+
       .todo-cat {
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 500;
-        padding: 3px 9px;
+        padding: 2px 8px;
         border-radius: var(--radius-pill);
         background: var(--cat-bg);
         color: var(--cat-text);
         flex-shrink: 0;
+      }
+
+      .todo-meta-dot {
+        color: var(--text-light);
+        font-size: 0.6rem;
+        line-height: 1;
+      }
+
+      .todo-timestamp {
+        font-size: 0.68rem;
+        color: var(--text-light);
+        white-space: nowrap;
+        letter-spacing: 0.01em;
+      }
+
+      .sort-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-radius: var(--radius-pill);
+        border: 1.5px solid var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        transition: all 0.15s;
+      }
+      .sort-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .sort-btn.active-sort {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: rgba(232, 93, 4, 0.06);
       }
 
       .todo-delete {
@@ -832,7 +884,7 @@
       .divider {
         height: 1px;
         background: var(--border);
-        margin: 1.75rem 0;
+        margin: 1rem 0;
       }
 
       /* ─── Logout badge ─── */
@@ -971,6 +1023,18 @@
 
         <div class="divider"></div>
 
+        <!-- List toolbar -->
+        <div class="list-toolbar">
+          <button
+            id="sort-btn"
+            class="sort-btn"
+            onclick="toggleSortOrder()"
+            title="Toggle sort order"
+          >
+            ↓ Newest
+          </button>
+        </div>
+
         <!-- Todo list -->
         <div id="todo-list"></div>
 
@@ -1001,6 +1065,7 @@
         categoryId: null, // filter
         createCategoryId: null, // picker for new todos
         darkMode: localStorage.getItem('darkMode') === 'true',
+        sortOrder: 'desc', // 'desc' = newest first, 'asc' = oldest first
       };
 
       // ═══════════════════════════════════════════════
@@ -1205,6 +1270,22 @@
         return cat ? cat.name : '—';
       }
 
+      function relativeTime(dateStr) {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const diff = Date.now() - d.getTime();
+        const s = Math.floor(diff / 1000);
+        const m = Math.floor(s / 60);
+        const h = Math.floor(m / 60);
+        const days = Math.floor(h / 24);
+        if (s < 60) return 'just now';
+        if (m < 60) return `${m}m ago`;
+        if (h < 24) return `${h}h ago`;
+        if (days === 1) return 'yesterday';
+        if (days < 7) return `${days}d ago`;
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
       function renderTodos() {
         const list = document.getElementById('todo-list');
         if (state.todos.length === 0) {
@@ -1215,7 +1296,13 @@
           return;
         }
 
-        list.innerHTML = state.todos
+        const sorted = [...state.todos].sort((a, b) => {
+          const ta = new Date(a.updatedAt).getTime() || 0;
+          const tb = new Date(b.updatedAt).getTime() || 0;
+          return state.sortOrder === 'asc' ? ta - tb : tb - ta;
+        });
+
+        list.innerHTML = sorted
           .map((todo, i) => {
             const catName = getCategoryName(todo.categoryId);
             const checked = todo.completed;
@@ -1225,11 +1312,25 @@
         onclick="toggleTodo('${todo.id}', ${checked})"
         title="${checked ? 'Mark incomplete' : 'Mark complete'}"></button>
       <span class="todo-title${checked ? ' completed' : ''}">${escapeHtml(todo.title)}</span>
-      <span class="todo-cat">${escapeHtml(catName)}</span>
+      <div class="todo-meta">
+        <span class="todo-cat">${escapeHtml(catName)}</span>
+        <span class="todo-meta-dot">·</span>
+        <span class="todo-timestamp">${relativeTime(todo.updatedAt)}</span>
+      </div>
       <button class="todo-delete" onclick="deleteTodo('${todo.id}')" title="Delete">✕</button>
     </div>`;
           })
           .join('');
+      }
+
+      function toggleSortOrder() {
+        state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
+        const btn = document.getElementById('sort-btn');
+        if (btn) {
+          btn.textContent = state.sortOrder === 'desc' ? '↓ Newest' : '↑ Oldest';
+          btn.classList.toggle('active-sort', state.sortOrder === 'asc');
+        }
+        renderTodos();
       }
 
       function renderTodosLoading() {
