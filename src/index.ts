@@ -7,6 +7,7 @@ import { categoryRouter } from './routers/category';
 import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
 import { Scalar } from '@scalar/hono-api-reference';
+import { yoga } from './graphql';
 
 const APP_VERSION: string = Bun.env.npm_package_version ?? 'unknown';
 
@@ -35,6 +36,9 @@ app.use('/api/categories*', publicRateLimiter);
 app.route('/api/categories', categoryRouter);
 app.route('/api', userRouter); // Handles /api/auth/* and /api/users/*
 app.route('/api/todos', todoRouter);
+
+// GraphQL endpoint
+app.on(['GET', 'POST'], '/graphql', (c) => yoga.fetch(c.req.raw, c));
 
 // Register Bearer security scheme so Swagger UI shows the Authorize button
 app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
@@ -78,6 +82,7 @@ app.get('/', (c) => {
     version: APP_VERSION,
     framework: 'Hono',
     documentation: '/doc',
+    graphql: '/graphql',
     environment: Bun.env.NODE_ENV || 'development',
   });
 });

@@ -26,6 +26,8 @@
     "@scalar/hono-api-reference": "^0.10.7",
     "@scalar/openapi-to-markdown": "^0.5.2",
     "dayjs": "^1.11.20",
+    "graphql": "^16.13.2",
+    "graphql-yoga": "^5.21.0",
     "hono": "^4.12.12",
     "hono-pino": "^0.10.3",
     "hono-rate-limiter": "^0.5.3",

@@ -1,0 +1,57 @@
+type Category {
+  id: Int!
+  name: String!
+}
+
+type Todo {
+  id: String!
+  title: String!
+  completed: Boolean!
+  categoryId: Int!
+  category: Category!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Pagination {
+  page: Int!
+  limit: Int!
+  total: Int!
+  totalPages: Int!
+}
+
+type TodoPage {
+  data: [Todo!]!
+  pagination: Pagination!
+}
+
+type User {
+  id: String!
+  email: String!
+  todos: [Todo!]!
+}
+
+type Query {
+  me: User
+  todos(categoryId: Int, page: Int, limit: Int): TodoPage!
+  todo(id: String!): Todo
+}
+
+type Mutation {
+  login(email: String!, password: String!): AuthPayload!
+  signup(email: String!, password: String!): AuthPayload!
+  createTodo(title: String!, completed: Boolean, categoryId: Int): Todo!
+  updateTodo(id: String!, title: String, completed: Boolean, categoryId: Int): Todo!
+  deleteTodo(id: String!): DeleteResult!
+}
+
+type DeleteResult {
+  message: String!
+  id: String!
+}
+
+type AuthPayload {
+  token: String!
+  userId: String!
+  email: String!
+}

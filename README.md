@@ -8,16 +8,18 @@ A production-ready Todo List API built with Hono framework, Prisma ORM, and Post
 - **Database**: PostgreSQL with Prisma ORM
 - **Rate Limiting**: Three-tier rate limiting (auth, public, authenticated endpoints)
 - **Logging**: Structured logging with Pino (development and production modes)
-- **API Documentation**: OpenAPI/Swagger documentation
+- **REST API**: OpenAPI/Swagger documentation via Scalar UI
+- **GraphQL API**: Schema-first GraphQL endpoint with GraphiQL playground
 - **Security**: Input validation, sensitive data redaction, secure defaults
 
 ## Tech Stack
 
 - **Runtime**: Bun
 - **Framework**: Hono
-- **Database**: PostgreSQL (Prisma-hosted)
+- **Database**: PostgreSQL (Prisma-hosted or self-hosted)
 - **ORM**: Prisma
 - **Authentication**: JWT
+- **GraphQL**: graphql-yoga (schema-first)
 - **Logging**: Pino with hono-pino
 - **Rate Limiting**: hono-rate-limiter
 
@@ -70,11 +72,9 @@ The API will be available at `http://localhost:3001`
 
 ## API Documentation
 
-Interactive API documentation (Swagger UI) is available at:
-
-```
-http://localhost:3001/doc
-```
+- **REST (Scalar UI)**: `http://localhost:3001/doc`
+- **REST (OpenAPI spec)**: `http://localhost:3001/doc/openapi.json`
+- **GraphQL (GraphiQL playground)**: `http://localhost:3001/graphql` — pass `Authorization: Bearer <token>` in the Headers panel
 
 ## API Endpoints
 
@@ -105,6 +105,47 @@ http://localhost:3001/doc
 - `GET /api/categories?includeTodos=true` - Include todos in response (**admin only**)
 - `GET /api/categories/{id}` - Get category by ID (public)
 - `GET /api/categories/{id}?includeTodos=true` - Include todos in response (**admin only**)
+
+## GraphQL API
+
+Single endpoint at `POST /graphql` (also `GET /graphql` for GraphiQL). Auth is passed via `Authorization: Bearer <token>` header.
+
+### Queries
+
+```graphql
+# Authenticated user profile
+me: User
+
+# Authenticated user's todos (mirrors REST pagination + category filter)
+todos(categoryId: Int, page: Int, limit: Int): TodoPage!
+
+# Single todo owned by the authenticated user
+todo(id: String!): Todo
+```
+
+### Mutations
+
+```graphql
+# Public — returns token immediately
+login(email: String!, password: String!): AuthPayload!
+signup(email: String!, password: String!): AuthPayload!
+
+# Authenticated
+createTodo(title: String!, completed: Boolean, categoryId: Int): Todo!
+updateTodo(id: String!, title: String, completed: Boolean, categoryId: Int): Todo!
+deleteTodo(id: String!): DeleteResult!
+```
+
+### Error handling
+
+GraphQL always responds HTTP 200. Errors surface in the `errors[]` array with an `extensions.code` field:
+
+| Code | Meaning |
+|------|---------|
+| `UNAUTHENTICATED` | Missing or invalid JWT |
+| `FORBIDDEN` | Authenticated but not the resource owner |
+| `NOT_FOUND` | Resource does not exist |
+| `BAD_USER_INPUT` | Invalid credentials or duplicate email |
 
 ## Role-Based Access Control
 
@@ -237,23 +278,35 @@ See `RATE_LIMITING_AND_LOGGING_IMPLEMENTATION.md` for detailed production deploy
 ```
 .
 ├── prisma/
-│   ├── schema.prisma       # Database schema
-│   ├── seed.ts            # Database seeding
-│   └── migrations/        # Migration history
-├── src/
-│   ├── index.hono.ts      # Main application entry
-│   ├── hono-routers/      # API route handlers
-│   │   ├── category.ts
-│   │   ├── todo.ts
-│   │   └── user.ts
-│   └── lib/               # Shared utilities
-│       ├── auth.hono.ts   # JWT authentication
-│       ├── logger.hono.ts # Logging configuration
-│       ├── rate-limit.hono.ts # Rate limiting
-│       ├── errors.ts      # Custom error classes
-│       ├── message.hono.ts # Response formatting
-│       └── index.ts       # Prisma client
-└── docs/                  # Additional documentation
+│   ├── schema.prisma          # Database schema
+│   ├── seed.ts                # Database seeding
+│   └── migrations/            # Migration history
+└── src/
+    ├── index.ts               # App entry — middleware, router mounts, /graphql
+    ├── routers/               # REST route handlers (OpenAPI-first)
+    │   ├── category.ts
+    │   ├── todo.ts
+    │   └── user.ts
+    ├── graphql/               # GraphQL layer (graphql-yoga, schema-first)
+    │   ├── schema.graphql     # SDL type definitions
+    │   ├── context.ts         # JWT → userId extraction, requireAuth()
+    │   ├── index.ts           # createYoga() instance
+    │   └── resolvers/
+    │       ├── Query.ts       # me, todos, todo
+    │       ├── Mutation.ts    # login, signup, createTodo, updateTodo, deleteTodo
+    │       ├── Todo.ts        # Todo.category nested resolver
+    │       └── User.ts        # User.todos nested resolver
+    ├── lib/                   # Shared utilities
+    │   ├── auth.ts            # JWT sign/verify, authMiddleware, optionalAuth
+    │   ├── errors.ts          # AppError hierarchy
+    │   ├── index.ts           # Prisma client + extensions
+    │   ├── logger.ts          # Pino structured logging
+    │   ├── message.ts         # Response formatting helpers
+    │   ├── openapi.ts         # OpenAPI shared components
+    │   └── rate-limit.ts      # Three-tier rate limiter config
+    ├── generated/             # Prisma-generated client (do not edit)
+    ├── types/                 # Shared TypeScript types
+    └── static/                # Served frontend assets
 ```
 
 ## License

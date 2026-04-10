@@ -49,6 +49,7 @@ bunx prisma generate
 - **Authentication**: JWT with dual support (Authorization header + HttpOnly cookies)
 - **Logging**: Pino with hono-pino integration
 - **Rate Limiting**: hono-rate-limiter with three-tier configuration
+- **GraphQL**: graphql-yoga (schema-first, mounted alongside REST at `/graphql`)
 
 ### Key Architectural Patterns
 
@@ -104,6 +105,27 @@ Environment-aware logging in `src/lib/logger.ts`:
   - `logDatabase()`: Database operation timing
 - Automatic sensitive data redaction (passwords, tokens, cookies)
 
+#### 7. GraphQL Layer
+Schema-first GraphQL API using graphql-yoga, coexisting with REST under `src/graphql/`:
+
+```
+src/graphql/
+  schema.graphql          ← SDL type definitions (source of truth)
+  context.ts              ← extracts userId from JWT; exports requireAuth()
+  resolvers/
+    Query.ts              ← me, todos(categoryId, page, limit), todo(id)
+    Mutation.ts           ← createTodo, updateTodo, deleteTodo
+    Todo.ts               ← Todo.category nested resolver
+    User.ts               ← User.todos nested resolver
+  index.ts                ← createYoga() instance, mounted at /graphql
+```
+
+**Auth in GraphQL**: `buildContext` in `context.ts` reads the `Authorization: Bearer` header and calls `verify` from `hono/jwt` directly — same JWT secret and algorithm as the REST middleware. The extracted `userId` is passed to every resolver via the context argument. Use `requireAuth(ctx)` at the top of any resolver that requires a logged-in user; it throws `GraphQLError` with `code: UNAUTHENTICATED` rather than returning an HTTP 401.
+
+**Error handling**: GraphQL always responds HTTP 200. Errors appear in the `errors[]` array with an `extensions.code` field (`UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `BAD_REQUEST`).
+
+**N+1 note**: The `Todo.category` resolver issues one `findUnique` per todo. This is intentional for learning purposes. A DataLoader would batch these into a single query.
+
 ### Database Schema Notes
 
 #### Key Relationships
@@ -141,6 +163,14 @@ NODE_ENV=development|production      # Environment mode
 4. Use `authMiddleware` or `optionalAuth` as needed
 5. Access user ID via `c.get('userId')`
 
+### Adding a GraphQL Resolver
+1. Add the new field or type to `src/graphql/schema.graphql`
+2. Implement the resolver function in the appropriate file under `src/graphql/resolvers/`
+   - Root fields go in `Query.ts` or `Mutation.ts`
+   - Type-level field resolvers (nested data) go in a file named after the type (e.g., `Todo.ts`)
+3. Call `requireAuth(ctx)` at the top of any resolver that requires authentication
+4. Register new type resolvers in the `resolvers` map in `src/graphql/index.ts`
+
 ### Adding Database Operations
 - Use Prisma client from `src/lib/index.ts`
 - For complex operations, consider adding custom methods via Prisma client extensions
@@ -163,3 +193,4 @@ await Bun.password.verify(password, hashedPassword)
 - Swagger UI available at `http://localhost:3001/doc`
 - OpenAPI spec at `http://localhost:3001/doc/openapi.json`
 - All routes auto-documented via Zod schemas
+- GraphQL playground (GraphiQL) at `http://localhost:3001/graphql` — use the Headers panel to pass `Authorization: Bearer <token>`
