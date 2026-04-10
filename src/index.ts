@@ -8,6 +8,7 @@ import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
 import { Scalar } from '@scalar/hono-api-reference';
 import { yoga } from './graphql';
+import { generateReleasePage } from './lib/release-page';
 
 const APP_VERSION: string = Bun.env.npm_package_version ?? 'unknown';
 
@@ -72,6 +73,13 @@ app.get('/app', async (c) => {
   const file = Bun.file(import.meta.dir + '/static/index.html');
   const html = await file.text();
   return c.html(html);
+});
+
+// Changelog / release notes
+app.get('/release', async (c) => {
+  const file = Bun.file(import.meta.dir + '/../CHANGELOG.md');
+  const markdown = await file.text();
+  return c.html(generateReleasePage(markdown));
 });
 
 // Health check

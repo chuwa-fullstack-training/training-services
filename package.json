@@ -12,9 +12,9 @@
     "db:generate": "prisma generate",
     "check-types": "bunx --bun tsc --noEmit",
     "format": "prettier --write .",
-    "version:patch": "npm version patch --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")",
-    "version:minor": "npm version minor --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")",
-    "version:major": "npm version major --no-git-tag-version && git add package.json && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")"
+    "version:patch": "npm version patch --no-git-tag-version && bun run scripts/update-changelog.ts && git add package.json CHANGELOG.md && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")",
+    "version:minor": "npm version minor --no-git-tag-version && bun run scripts/update-changelog.ts && git add package.json CHANGELOG.md && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")",
+    "version:major": "npm version major --no-git-tag-version && bun run scripts/update-changelog.ts && git add package.json CHANGELOG.md && git commit -m \"chore: bump version to $(node -p \"require('./package.json').version\")\" && git tag v$(node -p \"require('./package.json').version\")"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.6.1",
