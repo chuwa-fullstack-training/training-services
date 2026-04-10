@@ -13,6 +13,26 @@ type Todo {
   updatedAt: String!
 }
 
+type Comment {
+  id: String!
+  content: String!
+  postId: String!
+  author: User!
+  createdAt: String!
+}
+
+type Post {
+  id: String!
+  title: String!
+  content: String!
+  published: Boolean!
+  authorId: String!
+  author: User!
+  comments(page: Int, limit: Int): CommentPage!
+  createdAt: String!
+  updatedAt: String!
+}
+
 type Pagination {
   page: Int!
   limit: Int!
@@ -25,16 +45,29 @@ type TodoPage {
   pagination: Pagination!
 }
 
+type PostPage {
+  data: [Post!]!
+  pagination: Pagination!
+}
+
+type CommentPage {
+  data: [Comment!]!
+  pagination: Pagination!
+}
+
 type User {
   id: String!
   email: String!
   todos: [Todo!]!
+  posts(page: Int, limit: Int): PostPage!
 }
 
 type Query {
   me: User
   todos(categoryId: Int, page: Int, limit: Int): TodoPage!
   todo(id: String!): Todo
+  posts(page: Int, limit: Int): PostPage!
+  post(id: String!): Post
 }
 
 type Mutation {
@@ -43,6 +76,11 @@ type Mutation {
   createTodo(title: String!, completed: Boolean, categoryId: Int): Todo!
   updateTodo(id: String!, title: String, completed: Boolean, categoryId: Int): Todo!
   deleteTodo(id: String!): DeleteResult!
+  createPost(title: String!, content: String!, published: Boolean): Post!
+  updatePost(id: String!, title: String, content: String, published: Boolean): Post!
+  deletePost(id: String!): DeleteResult!
+  addComment(postId: String!, content: String!): Comment!
+  deleteComment(id: String!): DeleteResult!
 }
 
 type DeleteResult {

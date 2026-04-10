@@ -6,6 +6,8 @@ import { authRateLimiter, publicRateLimiter } from './lib/rate-limit';
 import { categoryRouter } from './routers/category';
 import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
+import { postRouter } from './routers/post';
+import { commentRouter } from './routers/comment';
 import { Scalar } from '@scalar/hono-api-reference';
 import { yoga } from './graphql';
 import { generateReleasePage } from './lib/release-page';
@@ -37,6 +39,8 @@ app.use('/api/categories*', publicRateLimiter);
 app.route('/api/categories', categoryRouter);
 app.route('/api', userRouter); // Handles /api/auth/* and /api/users/*
 app.route('/api/todos', todoRouter);
+app.route('/api/posts', postRouter);
+app.route('/api/posts', commentRouter); // Handles /api/posts/:postId/comments/*
 
 // GraphQL endpoint
 app.on(['GET', 'POST'], '/graphql', (c) => yoga.fetch(c.req.raw, c));
@@ -65,6 +69,8 @@ app.doc('/doc/openapi.json', {
     { name: 'User', description: 'User management endpoints' },
     { name: 'Todo', description: 'Todo CRUD endpoints' },
     { name: 'Category', description: 'Category management endpoints' },
+    { name: 'Post', description: 'Post CRUD endpoints' },
+    { name: 'Comment', description: 'Comment endpoints (nested under posts)' },
   ],
 });
 

@@ -2,7 +2,12 @@ import { GraphQLError } from 'graphql';
 import { prisma, formatDate } from '../../lib';
 import { signToken } from '../../lib/auth';
 import { UserAlreadyExistsError } from '../../lib/errors';
-import { requireAuth, type GraphQLContext } from '../context';
+import { requireAuth, requireAdmin, type GraphQLContext } from '../context';
+import { canReadPost } from '../../lib/access';
+
+function formatPost(p: { id: string; title: string; content: string; published: boolean; authorId: string; createdAt: Date; updatedAt: Date }) {
+  return { ...p, createdAt: formatDate(p.createdAt), updatedAt: formatDate(p.updatedAt) };
+}
 
 export const Mutation = {
   login: async (_: unknown, args: { email: string; password: string }) => {
@@ -109,5 +114,69 @@ export const Mutation = {
     await prisma.todo.delete({ where: { id: args.id } });
 
     return { message: 'Todo deleted successfully', id: args.id };
+  },
+
+  createPost: async (
+    _: unknown,
+    args: { title: string; content: string; published?: boolean },
+    ctx: GraphQLContext
+  ) => {
+    const userId = requireAuth(ctx);
+    const post = await prisma.post.create({
+      data: { title: args.title, content: args.content, published: args.published ?? false, authorId: userId },
+    });
+    return formatPost(post);
+  },
+
+  updatePost: async (
+    _: unknown,
+    args: { id: string; title?: string; content?: string; published?: boolean },
+    ctx: GraphQLContext
+  ) => {
+    const userId = requireAuth(ctx);
+    const existing = await prisma.post.findUnique({ where: { id: args.id } });
+    if (!existing) throw new GraphQLError('Post not found', { extensions: { code: 'NOT_FOUND' } });
+    if (existing.authorId !== userId && ctx.role !== 'ADMIN') {
+      throw new GraphQLError('Access denied', { extensions: { code: 'FORBIDDEN' } });
+    }
+    const { id, ...data } = args;
+    const post = await prisma.post.update({ where: { id }, data });
+    return formatPost(post);
+  },
+
+  deletePost: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+    const userId = requireAuth(ctx);
+    const existing = await prisma.post.findUnique({ where: { id: args.id } });
+    if (!existing) throw new GraphQLError('Post not found', { extensions: { code: 'NOT_FOUND' } });
+    if (existing.authorId !== userId && ctx.role !== 'ADMIN') {
+      throw new GraphQLError('Access denied', { extensions: { code: 'FORBIDDEN' } });
+    }
+    await prisma.post.delete({ where: { id: args.id } });
+    return { message: 'Post deleted successfully', id: args.id };
+  },
+
+  addComment: async (
+    _: unknown,
+    args: { postId: string; content: string },
+    ctx: GraphQLContext
+  ) => {
+    const userId = requireAuth(ctx);
+    const post = await prisma.post.findUnique({ where: { id: args.postId } });
+    if (!post) throw new GraphQLError('Post not found', { extensions: { code: 'NOT_FOUND' } });
+    if (!post.published) {
+      throw new GraphQLError('Cannot comment on an unpublished post', { extensions: { code: 'FORBIDDEN' } });
+    }
+    const comment = await prisma.comment.create({
+      data: { content: args.content, postId: args.postId, authorId: userId },
+    });
+    return { ...comment, createdAt: formatDate(comment.createdAt) };
+  },
+
+  deleteComment: async (_: unknown, args: { id: string }, ctx: GraphQLContext) => {
+    requireAdmin(ctx);
+    const existing = await prisma.comment.findUnique({ where: { id: args.id } });
+    if (!existing) throw new GraphQLError('Comment not found', { extensions: { code: 'NOT_FOUND' } });
+    await prisma.comment.delete({ where: { id: args.id } });
+    return { message: 'Comment deleted successfully', id: args.id };
   },
 };
