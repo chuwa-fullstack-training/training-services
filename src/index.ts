@@ -6,6 +6,7 @@ import { authRateLimiter, publicRateLimiter } from './lib/rate-limit';
 import { categoryRouter } from './routers/category';
 import { todoRouter } from './routers/todo';
 import { userRouter } from './routers/user';
+import { Scalar } from '@scalar/hono-api-reference';
 
 const APP_VERSION: string = Bun.env.npm_package_version ?? 'unknown';
 
@@ -43,14 +44,15 @@ app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
 });
 
 // Swagger UI
-app.get('/doc', swaggerUI({ url: '/doc/openapi.json' }));
+// app.get('/doc', swaggerUI({ url: '/doc/openapi.json' }));
+app.get('/doc', Scalar({ url: '/doc/openapi.json', theme: 'moon', pageTitle: 'API Document' }));
 
 // OpenAPI spec endpoint
 app.doc('/doc/openapi.json', {
   openapi: '3.0.0',
   info: {
-    title: 'Toy API',
-    version: '2.0.0',
+    title: 'Toy API Documentation',
+    version: APP_VERSION,
     description: 'Toy API - Hono Framework',
   },
   tags: [

@@ -23,6 +23,8 @@
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^6.19.3",
     "@prisma/extension-accelerate": "^3.0.1",
+    "@scalar/hono-api-reference": "^0.10.7",
+    "@scalar/openapi-to-markdown": "^0.5.2",
     "dayjs": "^1.11.20",
     "hono": "^4.12.12",
     "hono-pino": "^0.10.3",
