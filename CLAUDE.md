@@ -15,7 +15,7 @@ bun run build
 # Production server
 bun start
 
-# Run tests
+# Run tests (uses .env.test database)
 bun test
 
 # Type checking
@@ -86,6 +86,8 @@ OpenAPI-first approach using `@hono/zod-openapi`:
 - Router registration in `src/index.ts`:
   - `userRouter` handles both `/api/auth/*` and `/api/users/*`
   - `todoRouter` handles `/api/todos/*`
+  - `postRouter` handles `/api/posts/*`
+  - `commentRouter` handles `/api/posts/:postId/comments/*` (mounted at `/api/posts`)
   - `categoryRouter` handles `/api/categories/*`
 
 #### 5. Error Handling Pattern
@@ -143,19 +145,34 @@ src/graphql/
 - **Category**: Integer `@id @default(autoincrement())` - simple sequential
 
 #### Generated Client Location
-Prisma client is generated to `prisma/generated/client` (custom output location)
+Prisma client is generated to `src/generated/` (custom output in schema: `output = "../src/generated"`). Import as `'../generated/client'` from within `src/`.
 
 ### Environment Variables Required
 ```bash
-DATABASE_URL=postgresql://...        # PostgreSQL connection string
+DATABASE_URL=postgresql://...        # PostgreSQL connection string (dev/prod)
 JWT_SECRET=your_secret_key          # JWT signing secret
 NODE_ENV=development|production      # Environment mode
 ```
 
+For testing, create `.env.test` with a separate `DATABASE_URL`. The test runner force-applies `.env.test` in `tests/setup.ts` before any module that reads `process.env.DATABASE_URL` is imported — this is necessary because a shell-exported `DATABASE_URL` would otherwise take precedence over file-based env loading.
+
 ### Testing Strategy
-- Tests use Bun's built-in test runner
-- No separate test configuration needed
-- Run with `bun test`
+Tests use Bun's built-in test runner (`bun:test`) against a real PostgreSQL test database.
+
+**Setup files:**
+- `tests/setup.ts` — preloaded via `bunfig.toml`; reads `.env.test` with `readFileSync` and writes every key into `process.env` (overriding any shell-exported vars), then runs `prisma migrate deploy` on the test DB.
+- `tests/helpers/db.ts` — exports `prisma` and `truncateAndSeed()`, which truncates all tables (`RESTART IDENTITY CASCADE`) and re-creates the required default category (id = 1).
+- `tests/helpers/auth.ts` — `createUser(email)`, `createAdmin(email)`, `authHeader(token)`.
+- `tests/helpers/factories.ts` — `createTodo()`, `createPost()`, `createComment()`.
+- `tests/helpers/app.ts` — re-exports `app` from `src/index.ts` for `app.request()` calls (no live server needed).
+
+**Test layout:**
+```
+tests/unit/        # Pure-function tests — no DB required
+tests/integration/ # HTTP-level tests — each file runs beforeEach(truncateAndSeed)
+```
+
+**Running tests:** `bun test` (script sets `NODE_ENV=test`; `.env.test` is applied by the preload).
 
 ## Common Development Patterns
 
@@ -164,7 +181,15 @@ NODE_ENV=development|production      # Environment mode
 2. Add Zod schema for request/response validation
 3. Implement handler with OpenAPI metadata
 4. Use `authMiddleware` or `optionalAuth` as needed
-5. Access user ID via `c.get('userId')`
+5. Access user ID via `c.get('userId')`, role via `c.get('role')`
+
+### Post/Comment Visibility Pattern
+Post and comment read access uses `canReadPost()` from `src/lib/access.ts`:
+- **Admin**: always allowed
+- **Published post**: allowed for anyone
+- **Draft post**: owner only
+
+This function is shared between REST (`post.ts`, `comment.ts`) and GraphQL resolvers — add any new visibility logic there, not inline in handlers.
 
 ### Adding a GraphQL Resolver
 1. Add the new field or type to `src/graphql/schema.graphql`

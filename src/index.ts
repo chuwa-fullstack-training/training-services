@@ -132,6 +132,8 @@ console.log(`🌍 Environment: ${env}`);
 console.log(`🛡️ Rate limiting: Enabled`);
 console.log(`📊 Structured logging: Enabled`);
 
+export { app };
+
 export default {
   hostname,
   port,
