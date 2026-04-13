@@ -1,6 +1,6 @@
 {
   "name": "toy-service",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "scripts": {
     "build": "bun build src/index.ts --target bun --outdir ./dist",
     "dev": "bun run --watch src/index.ts",
